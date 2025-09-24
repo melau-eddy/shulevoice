@@ -1,0 +1,673 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}EduTrack Pro | Analytics Dashboard{% endblock %}
+
+{% block page_title %}Learning Analytics{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Add the analytics-specific CSS from your provided template */
+    .analytics {
+        padding: 2rem;
+    }
+
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+    }
+
+    .page-title h2 {
+        font-size: 1.8rem;
+        font-weight: 600;
+        color: var(--dark);
+        margin-bottom: 0.5rem;
+    }
+
+    .page-title p {
+        color: var(--gray);
+    }
+
+    .page-actions {
+        display: flex;
+        gap: 1rem;
+    }
+
+    .date-range {
+        background: white;
+        border-radius: 10px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        margin-bottom: 2rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    .date-presets {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .date-preset {
+        padding: 0.5rem 1rem;
+        border: 1px solid var(--light-gray);
+        border-radius: 6px;
+        background: white;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        color: var(--dark);
+    }
+
+    .date-preset.active {
+        background: var(--primary);
+        color: white;
+        border-color: var(--primary);
+    }
+
+    .custom-date {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .date-input {
+        padding: 0.5rem;
+        border: 1px solid var(--light-gray);
+        border-radius: 6px;
+        background: white;
+    }
+
+    .stats-overview {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .stat-card {
+        background: white;
+        border-radius: 10px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        transition: transform 0.3s ease;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-5px);
+    }
+
+    .stat-icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.8rem;
+        color: white;
+    }
+
+    .stat-icon.blue {
+        background: linear-gradient(135deg, var(--primary), var(--accent));
+    }
+
+    .stat-icon.green {
+        background: linear-gradient(135deg, var(--success), #22c55e);
+    }
+
+    .stat-icon.orange {
+        background: linear-gradient(135deg, var(--warning), #f97316);
+    }
+
+    .stat-icon.purple {
+        background: linear-gradient(135deg, #a855f7, #ec4899);
+    }
+
+    .stat-info h3 {
+        font-size: 1.8rem;
+        font-weight: 700;
+        margin-bottom: 0.2rem;
+    }
+
+    .stat-info p {
+        color: var(--gray);
+        font-size: 0.9rem;
+    }
+
+    .stat-trend {
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+        font-size: 0.8rem;
+        margin-top: 0.3rem;
+    }
+
+    .trend-up {
+        color: var(--success);
+    }
+
+    .trend-down {
+        color: var(--danger);
+    }
+
+    .charts-section {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .chart-container {
+        background: white;
+        border-radius: 10px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    }
+
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+    }
+
+    .section-header h3 {
+        font-size: 1.3rem;
+        font-weight: 600;
+        color: var(--dark);
+    }
+
+    .chart-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .chart-wrapper {
+        height: 300px;
+        position: relative;
+    }
+
+    .topics-list {
+        list-style: none;
+    }
+
+    .topic-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1rem 0;
+        border-bottom: 1px solid var(--light-gray);
+    }
+
+    .topic-item:last-child {
+        border-bottom: none;
+    }
+
+    .topic-info {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .topic-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1.2rem;
+    }
+
+    .topic-details h4 {
+        font-weight: 600;
+        margin-bottom: 0.2rem;
+    }
+
+    .topic-details p {
+        color: var(--gray);
+        font-size: 0.8rem;
+    }
+
+    .topic-stats {
+        text-align: right;
+    }
+
+    .topic-stats .value {
+        font-weight: 700;
+        font-size: 1.1rem;
+    }
+
+    .topic-stats .label {
+        color: var(--gray);
+        font-size: 0.8rem;
+    }
+
+    .response-analysis {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .response-card {
+        background: white;
+        border-radius: 10px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    }
+
+    .response-metrics {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+        margin-top: 1rem;
+    }
+
+    .metric {
+        text-align: center;
+        padding: 1rem;
+        border-radius: 8px;
+        background: var(--light);
+    }
+
+    .metric .value {
+        font-size: 1.8rem;
+        font-weight: 700;
+        margin-bottom: 0.3rem;
+    }
+
+    .metric .label {
+        color: var(--gray);
+        font-size: 0.8rem;
+    }
+
+    .activity-table {
+        background: white;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        margin-bottom: 2rem;
+    }
+
+    .table-header {
+        display: grid;
+        grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+        padding: 1rem 1.5rem;
+        background: var(--light);
+        font-weight: 600;
+        color: var(--gray);
+        font-size: 0.9rem;
+    }
+
+    .table-row {
+        display: grid;
+        grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid var(--light-gray);
+        align-items: center;
+    }
+
+    .table-row:last-child {
+        border-bottom: none;
+    }
+
+    .table-row:hover {
+        background: #f9fafb;
+    }
+
+    .student-cell {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .student-avatar {
+        width: 35px;
+        height: 35px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--primary), var(--accent));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+        font-size: 0.9rem;
+    }
+
+    @media (max-width: 1200px) {
+        .charts-section {
+            grid-template-columns: 1fr;
+        }
+        
+        .response-analysis {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .table-header, .table-row {
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+        }
+        
+        .table-header div:nth-child(n+3), 
+        .table-row div:nth-child(n+3) {
+            display: none;
+        }
+        
+        .response-metrics {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="analytics">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="page-title">
+            <h2>Learning Analytics</h2>
+            <p>Comprehensive insights into student engagement and performance</p>
+        </div>
+        <div class="page-actions">
+            <button class="btn btn-outline" onclick="refreshData()"><i class="fas fa-sync"></i> Refresh Data</button>
+            <button class="btn btn-primary" onclick="exportReport()"><i class="fas fa-download"></i> Export Report</button>
+        </div>
+    </div>
+
+    <!-- Date Range Selector -->
+    <div class="date-range">
+        <div class="date-presets">
+            <a href="?preset=today" class="date-preset {% if date_preset == 'today' %}active{% endif %}">Today</a>
+            <a href="?preset=last_7_days" class="date-preset {% if date_preset == 'last_7_days' %}active{% endif %}">Last 7 Days</a>
+            <a href="?preset=last_30_days" class="date-preset {% if date_preset == 'last_30_days' %}active{% endif %}">Last 30 Days</a>
+            <a href="?preset=this_semester" class="date-preset {% if date_preset == 'this_semester' %}active{% endif %}">This Semester</a>
+        </div>
+        <div class="custom-date">
+            <span>{{ start_date }} to {{ end_date }}</span>
+        </div>
+    </div>
+
+    <!-- Stats Overview -->
+    <div class="stats-overview">
+        <div class="stat-card">
+            <div class="stat-icon blue">
+                <i class="fas fa-clock"></i>
+            </div>
+            <div class="stat-info">
+                <h3>{{ total_learning_hours }}h</h3>
+                <p>Total Learning Time</p>
+                <div class="stat-trend trend-up">
+                    <i class="fas fa-arrow-up"></i> Active tracking
+                </div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon green">
+                <i class="fas fa-book-open"></i>
+            </div>
+            <div class="stat-info">
+                <h3>{{ topics_attempted }}</h3>
+                <p>Topics Attempted</p>
+                <div class="stat-trend trend-up">
+                    <i class="fas fa-arrow-up"></i> Real-time data
+                </div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon orange">
+                <i class="fas fa-microphone"></i>
+            </div>
+            <div class="stat-info">
+                <h3>{{ voice_responses }}</h3>
+                <p>Voice Responses</p>
+                <div class="stat-trend trend-up">
+                    <i class="fas fa-arrow-up"></i> Interactive learning
+                </div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon purple">
+                <i class="fas fa-chart-line"></i>
+            </div>
+            <div class="stat-info">
+                <h3>{{ average_accuracy }}%</h3>
+                <p>Average Accuracy</p>
+                <div class="stat-trend trend-up">
+                    <i class="fas fa-arrow-up"></i> Performance metric
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Section -->
+    <div class="charts-section">
+        <div class="chart-container">
+            <div class="section-header">
+                <h3>Learning Time Distribution</h3>
+                <div class="chart-actions">
+                    <button class="btn btn-outline" onclick="changeChartView('daily')">Daily</button>
+                    <button class="btn btn-outline active" onclick="changeChartView('weekly')">Weekly</button>
+                    <button class="btn btn-outline" onclick="changeChartView('monthly')">Monthly</button>
+                </div>
+            </div>
+            <div class="chart-wrapper">
+                <canvas id="timeChart"></canvas>
+            </div>
+        </div>
+        <div class="chart-container">
+            <div class="section-header">
+                <h3>Topics Attempted</h3>
+                <button class="btn btn-outline">View All</button>
+            </div>
+            <ul class="topics-list">
+                {% for topic in top_topics|slice:":4" %}
+                <li class="topic-item">
+                    <div class="topic-info">
+                        <div class="topic-icon" style="background: #{{ forloop.counter|add:3|add:100 }}B8F;">
+                            <i class="fas fa-book"></i>
+                        </div>
+                        <div class="topic-details">
+                            <h4>{{ topic.topic__name }}</h4>
+                            <p>{{ topic.topic__subject__name }}</p>
+                        </div>
+                    </div>
+                    <div class="topic-stats">
+                        <div class="value">{{ topic.attempts }}</div>
+                        <div class="label">Attempts</div>
+                    </div>
+                </li>
+                {% empty %}
+                <li class="topic-item">
+                    <div class="topic-info">
+                        <div class="topic-details">
+                            <h4>No topic data yet</h4>
+                            <p>Start tracking student progress</p>
+                        </div>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+
+    <!-- Response Analysis -->
+    <div class="response-analysis">
+        <div class="chart-container">
+            <div class="section-header">
+                <h3>Response Accuracy by Subject</h3>
+                <button class="btn btn-outline">Details</button>
+            </div>
+            <div class="chart-wrapper">
+                <canvas id="accuracyChart"></canvas>
+            </div>
+        </div>
+        <div class="response-card">
+            <div class="section-header">
+                <h3>Voice Response Analysis</h3>
+            </div>
+            <div class="response-metrics">
+                <div class="metric">
+                    <div class="value">{{ voice_analysis.understood }}%</div>
+                    <div class="label">Understood</div>
+                </div>
+                <div class="metric">
+                    <div class="value">{{ voice_analysis.clarification_needed }}%</div>
+                    <div class="label">Needed Clarification</div>
+                </div>
+                <div class="metric">
+                    <div class="value">{{ voice_analysis.not_understood }}%</div>
+                    <div class="label">Not Understood</div>
+                </div>
+                <div class="metric">
+                    <div class="value">{{ voice_analysis.no_response }}%</div>
+                    <div class="label">No Response</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Student Activity Table -->
+    <div class="chart-container">
+        <div class="section-header">
+            <h3>Student Activity Details</h3>
+            <button class="btn btn-outline" onclick="exportStudentData()">Export</button>
+        </div>
+        <div class="activity-table">
+            <div class="table-header">
+                <div>Student</div>
+                <div>Time Spent</div>
+                <div>Topics</div>
+                <div>Responses</div>
+                <div>Accuracy</div>
+            </div>
+            {% for student in student_activity %}
+            <div class="table-row">
+                <div class="student-cell">
+                    <div class="student-avatar">{{ student.name|slice:":2"|upper }}</div>
+                    <div>{{ student.name }}</div>
+                </div>
+                <div>{{ student.time_spent }}</div>
+                <div>{{ student.topics }}</div>
+                <div>{{ student.responses }}</div>
+                <div>{{ student.accuracy }}</div>
+            </div>
+            {% empty %}
+            <div class="table-row">
+                <div class="student-cell">
+                    <div>No student activity data available</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Initialize Charts
+    document.addEventListener('DOMContentLoaded', function() {
+        // Time Spent Chart - Simplified with sample data for now
+        const timeCtx = document.getElementById('timeChart').getContext('2d');
+        const timeChart = new Chart(timeCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
+                datasets: [{
+                    label: 'Mathematics',
+                    data: [12, 19, 15, 17],
+                    backgroundColor: '#4361ee',
+                    borderColor: '#3a0ca3',
+                    borderWidth: 1
+                }, {
+                    label: 'Science',
+                    data: [8, 12, 10, 14],
+                    backgroundColor: '#4cc9f0',
+                    borderColor: '#3a0ca3',
+                    borderWidth: 1
+                }, {
+                    label: 'Language Arts',
+                    data: [10, 14, 12, 16],
+                    backgroundColor: '#4ade80',
+                    borderColor: '#22c55e',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Hours'
+                        }
+                    }
+                }
+            }
+        });
+
+        // Accuracy Chart - Simplified with sample data
+        const accuracyCtx = document.getElementById('accuracyChart').getContext('2d');
+        const accuracyChart = new Chart(accuracyCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Mathematics', 'Science', 'Language Arts', 'Writing', 'Arts'],
+                datasets: [{
+                    data: [85, 78, 82, 75, 90],
+                    backgroundColor: [
+                        '#4361ee',
+                        '#4cc9f0',
+                        '#4ade80',
+                        '#f59e0b',
+                        '#a855f7'
+                    ],
+                    borderWidth: 2,
+                    borderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right'
+                    }
+                }
+            }
+        });
+    });
+
+    function refreshData() {
+        window.location.reload();
+    }
+
+    function exportReport() {
+        alert('Export functionality would be implemented here');
+    }
+
+    function exportStudentData() {
+        alert('Student data export would be implemented here');
+    }
+
+    function changeChartView(period) {
+        // This would typically make an AJAX call to update the chart data
+        alert('Changing to ' + period + ' view');
+    }
+</script>
+{% endblock %}
