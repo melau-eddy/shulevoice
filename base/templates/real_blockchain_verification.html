@@ -1,0 +1,163 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}Real Blockchain Verification - {{ student.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="page-header">
+                <h1>Real Blockchain Verification</h1>
+                <p class="lead">Live blockchain verification for {{ student.name }}</p>
+            </div>
+            
+            <!-- Network Status -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4 class="card-title">
+                        <i class="fas fa-network-wired me-2"></i>
+                        Blockchain Network Status
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="network-status {% if network_info.connected %}status-connected{% else %}status-disconnected{% endif %}">
+                                <span class="status-indicator {% if network_info.connected %}bg-success{% else %}bg-danger{% endif %}"></span>
+                                <strong>Status:</strong> 
+                                {% if network_info.connected %}Connected{% else %}Disconnected{% endif %}
+                            </div>
+                            <div class="mt-2">
+                                <strong>Network ID:</strong> {{ network_info.network_id|default:"N/A" }}
+                            </div>
+                            <div>
+                                <strong>Latest Block:</strong> {{ network_info.latest_block|default:"N/A"|intcomma }}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div>
+                                <strong>Contract Address:</strong> 
+                                <code class="small">{{ network_info.contract_address|default:"Not deployed" }}</code>
+                            </div>
+                            <div>
+                                <strong>Owner Address:</strong> 
+                                <code class="small">{{ network_info.owner_address|default:"Not configured" }}</code>
+                            </div>
+                            <div>
+                                <strong>Balance:</strong> {{ network_info.balance|default:0 }} wei
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Student Verification -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h4 class="card-title">Student Verification</h4>
+                            <p class="card-text">
+                                <strong>Blockchain ID:</strong> 
+                                <code>{{ student.blockchain_id }}</code>
+                            </p>
+                            <p class="card-text">
+                                <strong>Profile Hash:</strong> 
+                                <code>{{ student.profile_hash|truncatechars:20 }}</code>
+                            </p>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <div class="verification-result">
+                                <span class="badge {% if blockchain_verified %}bg-success{% else %}bg-warning{% endif %} p-3 fs-6">
+                                    <i class="fas fa-{% if blockchain_verified %}check-circle{% else %}exclamation-triangle{% endif %} me-2"></i>
+                                    {% if blockchain_verified %}Verified on Blockchain{% else %}Verification Failed{% endif %}
+                                </span>
+                            </div>
+                            <button class="btn btn-primary mt-2" onclick="verifyStudent()">
+                                <i class="fas fa-sync-alt me-2"></i>Re-verify
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Blockchain Transactions -->
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title">Blockchain Transactions</h4>
+                    <p class="card-subtitle">Total: {{ total_transactions }} transactions</p>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Type</th>
+                                    <th>Transaction Hash</th>
+                                    <th>Block</th>
+                                    <th>Gas Used</th>
+                                    <th>Timestamp</th>
+                                    <th>Contract</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for record in blockchain_records %}
+                                <tr>
+                                    <td>
+                                        <span class="badge bg-primary">{{ record.get_transaction_type_display }}</span>
+                                    </td>
+                                    <td>
+                                        <code class="small" title="{{ record.transaction_hash }}">
+                                            {{ record.transaction_hash|truncatechars:20 }}
+                                        </code>
+                                    </td>
+                                    <td>#{{ record.block_number|intcomma }}</td>
+                                    <td>{{ record.gas_used|default:"N/A" }}</td>
+                                    <td>{{ record.timestamp|naturaltime }}</td>
+                                    <td>
+                                        {% if record.contract_used %}
+                                            <i class="fas fa-check text-success"></i>
+                                        {% else %}
+                                            <i class="fas fa-times text-muted"></i>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted py-4">
+                                        No blockchain transactions found for this student.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function verifyStudent() {
+    fetch(`/api/student/{{ student.id }}/verify-blockchain/`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.verified) {
+                showAlert('Verification successful!', 'success');
+            } else {
+                showAlert('Verification failed: ' + (data.error || 'Unknown error'), 'error');
+            }
+        })
+        .catch(error => {
+            showAlert('Verification error: ' + error, 'error');
+        });
+}
+
+function showAlert(message, type) {
+    // Implement alert display
+    alert(message);
+}
+</script>
+{% endblock %}

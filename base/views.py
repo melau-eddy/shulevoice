@@ -5,7 +5,7 @@ from django.utils import timezone
 from .models import *
 from datetime import datetime, timedelta
 import random
-
+from django.db import models  
 from django.utils import timezone
 from datetime import timedelta
 from django.db.models import Q
@@ -245,11 +245,6 @@ def dashboard(request):
             'active_students_count': active_students_count,
         }
         
-        # Debug output to console
-        print(f"DEBUG: Total students: {total_students}")
-        print(f"DEBUG: Top performers count: {len(top_performers)}")
-        print(f"DEBUG: Context keys: {context.keys()}")
-        
         return render(request, 'dashboard.html', context)
         
     except Exception as e:
@@ -401,12 +396,14 @@ def add_student(request):
         student_id = request.POST.get('student_id', '').strip().upper()
         grade_level = request.POST.get('grade_level', '')
         age = request.POST.get('age', '')
-        enrollment_date = request.POST.get('enrollment_date', '')
+        enrollment_date_str = request.POST.get('enrollment_date', '')  # Renamed to avoid confusion
         is_active = request.POST.get('is_active') == 'on'
         notes = request.POST.get('notes', '').strip()
         
         # Validation
         errors = {}
+        enrollment_date = None  # Initialize as None
+        
         if not name:
             errors['name'] = 'Name is required'
         elif len(name) < 2:
@@ -430,12 +427,17 @@ def add_student(request):
             except ValueError:
                 errors['age'] = 'Age must be a valid number'
         
-        if enrollment_date:
+        # Handle enrollment date properly
+        if enrollment_date_str:
             try:
-                # Validate date format
-                datetime.strptime(enrollment_date, '%Y-%m-%d')
+                # Parse the string to a date object
+                parsed_date = datetime.datetime.strptime(enrollment_date_str, '%Y-%m-%d')
+                enrollment_date = parsed_date.date()  # Convert to date object
             except ValueError:
-                errors['enrollment_date'] = 'Invalid date format'
+                errors['enrollment_date'] = 'Invalid date format. Use YYYY-MM-DD.'
+        else:
+            # Use today's date as default if no date provided
+            enrollment_date = timezone.now().date()
         
         if not errors:
             try:
@@ -444,7 +446,7 @@ def add_student(request):
                     student_id=student_id,
                     grade_level=grade_level,
                     age=age or None,
-                    enrollment_date=enrollment_date or timezone.now().date(),
+                    enrollment_date=enrollment_date,  # Use the date object here
                     is_active=is_active,
                     notes=notes,
                     created_by=request.user
@@ -466,9 +468,10 @@ def add_student(request):
             for field, error in errors.items():
                 messages.error(request, f'{field.title()}: {error}')
     
-    # For GET requests, pass the current POST data to repopulate form on error
+    # For GET requests, show empty form
     context = {
         'grade_choices': Student.GRADE_LEVELS,
+        'today': timezone.now().date().isoformat()  # Pre-fill today's date in format YYYY-MM-DD
     }
     
     return render(request, 'add_student.html', context)
@@ -1353,3 +1356,719 @@ def password_reset_request(request):
     """Password reset request view"""
     messages.info(request, 'Password reset functionality would be implemented here.')
     return redirect('login')
+
+
+# Add to views.py
+# Add to views.py
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required
+from django.db.models import Count, Avg, Sum, Q
+from django.http import JsonResponse
+from django.contrib import messages
+from django.utils import timezone
+from datetime import timedelta
+from decimal import Decimal
+from .models import *
+import json
+
+@login_required
+def student_progress_view(request, student_id=None):
+    """Student's personal progress dashboard"""
+    try:
+        # Safe check for student profile access
+        is_student_user = False
+        student_profile = None
+        
+        try:
+            if hasattr(request.user, 'student_profile'):
+                student_profile = request.user.student_profile
+                if student_profile and getattr(student_profile, 'can_login', False):
+                    is_student_user = True
+        except Exception as e:
+            print(f"Student profile check error: {e}")
+            is_student_user = False
+        
+        # Determine which student to show
+        if is_student_user:
+            # Student accessing their own progress
+            student = student_profile
+            is_own_profile = True
+            template_name = 'student_progress.html'
+        elif student_id and (request.user.is_staff or request.user.is_superuser):
+            # Educator viewing specific student
+            student = get_object_or_404(Student, id=student_id)
+            is_own_profile = False
+            template_name = 'student_progress.html'
+        else:
+            # Educator viewing their default student or first student
+            try:
+                student = Student.objects.filter(created_by=request.user).first()
+                if not student:
+                    messages.info(request, "No students found. Please add students first.")
+                    return redirect('students')
+                is_own_profile = True
+                template_name = 'student_progress.html'
+            except Exception as e:
+                messages.error(request, "Error accessing student data.")
+                return redirect('dashboard')
+        
+        # Calculate overall progress
+        progress_data = StudentProgress.objects.filter(student=student).aggregate(
+            avg_progress=Avg('progress_percentage'),
+            total_assignments=Count('id'),
+            completed_assignments=Count('id', filter=Q(completed=True)),
+            avg_score=Avg('score'),
+            total_time=Sum('time_spent')
+        )
+        
+        overall_progress = progress_data['avg_progress'] or 0
+        total_assignments = progress_data['total_assignments'] or 0
+        completed_assignments = progress_data['completed_assignments'] or 0
+        avg_score = progress_data['avg_score'] or 0
+        total_time_minutes = progress_data['total_time'] or 0
+        
+        # Calculate subject-wise progress
+        subjects_progress = []
+        subjects = Subject.objects.all()
+        
+        for subject in subjects:
+            subject_progress = StudentProgress.objects.filter(
+                student=student, 
+                subject=subject
+            ).aggregate(
+                avg_progress=Avg('progress_percentage'),
+                completed=Count('id', filter=Q(completed=True)),
+                total=Count('id')
+            )
+            
+            if subject_progress['total'] > 0:
+                progress_percent = subject_progress['avg_progress'] or 0
+                subjects_progress.append({
+                    'subject': subject,
+                    'progress': progress_percent,
+                    'completed': subject_progress['completed'],
+                    'total': subject_progress['total'],
+                    'color': get_subject_color(subject.name)
+                })
+        
+        # Get recent activities
+        recent_activities = StudentProgress.objects.filter(
+            student=student
+        ).select_related('assignment', 'subject').order_by('-last_updated')[:10]
+        
+        # Format activities for display
+        formatted_activities = []
+        for activity in recent_activities:
+            if activity.assignment:
+                activity_type = 'assignment'
+                title = f"Completed: {activity.assignment.title}"
+                description = f"Score: {activity.score or 'N/A'}% • Time: {activity.time_spent}min"
+                icon = get_subject_icon(activity.subject.name if activity.subject else 'general')
+            else:
+                activity_type = 'progress'
+                title = "Progress Update"
+                description = f"Updated {activity.subject.name if activity.subject else 'general'} progress"
+                icon = 'chart-line'
+            
+            formatted_activities.append({
+                'type': activity_type,
+                'title': title,
+                'description': description,
+                'icon': icon,
+                'timestamp': activity.last_updated,
+                'subject_color': get_subject_color(activity.subject.name if activity.subject else 'general')
+            })
+        
+        # Get student goals
+        current_goals = StudentGoal.objects.filter(
+            student=student, 
+            completed=False
+        ).order_by('deadline')[:5]
+        
+        # Get achievements
+        earned_achievements = StudentAchievement.objects.filter(
+            student=student
+        ).select_related('achievement').order_by('-earned_date')[:6]
+        
+        all_achievements = Achievement.objects.all()
+        unearned_achievements = all_achievements.exclude(
+            id__in=earned_achievements.values_list('achievement_id', flat=True)
+        )[:6-len(earned_achievements)]
+        
+        # Get learning streak
+        streak, created = LearningStreak.objects.get_or_create(student=student)
+        
+        # Calculate weekly progress
+        one_week_ago = timezone.now() - timedelta(days=7)
+        weekly_progress = StudentProgress.objects.filter(
+            student=student,
+            last_updated__gte=one_week_ago
+        ).aggregate(
+            completed=Count('id', filter=Q(completed=True)),
+            total_time=Sum('time_spent')
+        )
+        
+        # Get class rank (simplified)
+        total_students = Student.objects.filter(
+            created_by=student.created_by,
+            is_active=True
+        ).count()
+        
+        # Simplified rank calculation
+        student_rank = 1
+        
+        context = {
+            'student': student,
+            'is_own_profile': is_own_profile,
+            'is_student_user': is_student_user,
+            'overall_progress': round(overall_progress, 1),
+            'total_assignments': total_assignments,
+            'completed_assignments': completed_assignments,
+            'avg_score': round(avg_score, 1),
+            'total_time_hours': round(total_time_minutes / 60, 1),
+            'subjects_progress': subjects_progress,
+            'recent_activities': formatted_activities,
+            'current_goals': current_goals,
+            'earned_achievements': earned_achievements,
+            'unearned_achievements': unearned_achievements,
+            'learning_streak': streak.current_streak,
+            'longest_streak': streak.longest_streak,
+            'weekly_completed': weekly_progress['completed'] or 0,
+            'weekly_time': round((weekly_progress['total_time'] or 0) / 60, 1),
+            'class_rank': student_rank,
+            'total_classmates': total_students - 1,
+            'motivational_message': get_motivational_message(overall_progress, streak.current_streak),
+        }
+        
+        return render(request, template_name, context)
+        
+    except Exception as e:
+        print(f"Student progress error: {e}")
+        messages.error(request, "Error loading progress dashboard")
+        return redirect('dashboard')
+
+def get_subject_color(subject_name):
+    """Get color for subject"""
+    color_map = {
+        'Mathematics': '#FF6B6B',
+        'Science': '#4ECDC4',
+        'Reading': '#FFD166',
+        'Writing': '#06D6A0',
+        'Language Arts': '#118AB2',
+        'Arts': '#A663CC',
+        'Social Studies': '#FF9E64',
+    }
+    return color_map.get(subject_name, '#4361ee')
+
+def get_subject_icon(subject_name):
+    """Get icon for subject"""
+    icon_map = {
+        'Mathematics': 'calculator',
+        'Science': 'flask',
+        'Reading': 'book',
+        'Writing': 'pencil-alt',
+        'Language Arts': 'language',
+        'Arts': 'palette',
+        'Social Studies': 'globe-americas',
+    }
+    return icon_map.get(subject_name, 'book')
+
+def get_motivational_message(progress, streak):
+    """Generate motivational message based on progress and streak"""
+    messages = []
+    
+    if progress >= 90:
+        messages.append("Outstanding work! You're mastering your subjects!")
+    elif progress >= 75:
+        messages.append("Great progress! You're doing amazing!")
+    elif progress >= 50:
+        messages.append("Good work! Keep going, you're getting there!")
+    else:
+        messages.append("Every journey starts with a first step. Keep learning!")
+    
+    if streak >= 7:
+        messages.append(f"Amazing {streak}-day streak! Your consistency is impressive!")
+    elif streak >= 3:
+        messages.append(f"Nice {streak}-day streak! Keep the momentum going!")
+    
+    return " ".join(messages) if messages else "Keep up the great work!"
+
+# views.py - Replace the voice_assistant_api function
+# views.py - Replace the voice_assistant_api function
+import json
+import random
+from django.views.decorators.csrf import csrf_exempt
+from django.http import JsonResponse
+from django.contrib.auth.decorators import login_required
+
+@login_required
+@csrf_exempt
+def voice_assistant_api(request):
+    """Enhanced voice assistant with real conversation capabilities"""
+    print(f"Voice Assistant API called - Method: {request.method}")  # Debug
+    
+    if request.method == 'POST':
+        try:
+            # Debug: Print raw request body
+            body = request.body.decode('utf-8')
+            print(f"Raw request body: {body}")  # Debug
+            
+            # Handle empty body
+            if not body.strip():
+                return JsonResponse({
+                    'success': False, 
+                    'error': 'Empty request body',
+                    'response': "I didn't receive any message. Please try again."
+                })
+            
+            try:
+                data = json.loads(body)
+            except json.JSONDecodeError as e:
+                print(f"JSON decode error: {e}")  # Debug
+                return JsonResponse({
+                    'success': False, 
+                    'error': 'Invalid JSON format',
+                    'response': "There was an issue with your request. Please try again."
+                })
+            
+            user_message = data.get('message', '').strip()
+            conversation_context = data.get('context', [])
+            
+            print(f"Voice Assistant - User message: '{user_message}'")  # Debug
+            
+            # Safe student access
+            student = None
+            try:
+                if hasattr(request.user, 'student_profile') and request.user.student_profile:
+                    student = request.user.student_profile
+                    print(f"Found student profile: {student.name}")  # Debug
+                else:
+                    student = Student.objects.filter(created_by=request.user).first()
+                    if student:
+                        print(f"Using fallback student: {student.name}")  # Debug
+            except Exception as e:
+                print(f"Error accessing student: {e}")  # Debug
+                return JsonResponse({
+                    'success': False, 
+                    'error': 'Student access error',
+                    'response': "I couldn't access your student profile. Please contact your teacher."
+                })
+            
+            if not student:
+                return JsonResponse({
+                    'success': False, 
+                    'error': 'No student data found',
+                    'response': "I couldn't find your student profile. Please contact your teacher."
+                })
+            
+            # Get comprehensive student data for context
+            student_data = get_student_context_data(student)
+            print(f"Student data retrieved successfully")  # Debug
+            
+            # Generate intelligent response
+            response_text = generate_intelligent_response(
+                user_message, 
+                student, 
+                student_data,
+                conversation_context
+            )
+            print(f"Generated response: {response_text[:100]}...")  # Debug
+            
+            # Update learning streak for activity
+            update_student_activity(student)
+            
+            # Log the interaction
+            try:
+                VoiceInteraction.objects.create(
+                    student=student,
+                    voice_command=user_message[:500],  # Limit length
+                    system_response=response_text[:500],
+                    success=True,
+                    confidence_score=0.9
+                )
+                print("Voice interaction logged successfully")  # Debug
+            except Exception as e:
+                print(f"Error logging interaction: {e}")  # Debug
+            
+            response_data = {
+                'success': True,
+                'response': response_text,
+                'context': conversation_context[-5:] + [{'user': user_message, 'assistant': response_text}]
+            }
+            
+            print(f"Returning response: {json.dumps(response_data)[:200]}...")  # Debug
+            return JsonResponse(response_data)
+            
+        except Exception as e:
+            print(f"Voice assistant error: {e}")
+            import traceback
+            traceback.print_exc()
+            
+            return JsonResponse({
+                'success': False,
+                'error': str(e),
+                'response': "I encountered an unexpected error. Please try again in a moment."
+            })
+    
+    # Handle GET requests or other methods
+    return JsonResponse({
+        'success': False, 
+        'error': 'Invalid request method', 
+        'response': 'Please use POST method for voice assistant requests.'
+    })
+
+def get_student_context_data(student):
+    """Get comprehensive student data for context-aware responses"""
+    try:
+        # Progress data
+        progress_data = StudentProgress.objects.filter(student=student).aggregate(
+            avg_progress=Avg('progress_percentage'),
+            completed=Count('id', filter=Q(completed=True)),
+            total=Count('id'),
+            avg_score=Avg('score'),
+            total_time=Sum('time_spent')
+        )
+        
+        # Recent activities (limit to avoid too much data)
+        recent_activities = StudentProgress.objects.filter(
+            student=student
+        ).select_related('assignment', 'subject').order_by('-last_updated')[:3]
+        
+        # Subjects progress
+        subjects_data = []
+        for subject in Subject.objects.all()[:6]:  # Limit to first 6 subjects
+            subject_progress = StudentProgress.objects.filter(
+                student=student, subject=subject
+            ).aggregate(
+                avg_progress=Avg('progress_percentage'),
+                completed=Count('id', filter=Q(completed=True)),
+                total=Count('id')
+            )
+            if subject_progress['total'] > 0:
+                subjects_data.append({
+                    'name': subject.name,
+                    'progress': float(subject_progress['avg_progress'] or 0),
+                    'completed': subject_progress['completed'] or 0,
+                    'total': subject_progress['total'] or 0
+                })
+        
+        # Learning streak
+        streak, created = LearningStreak.objects.get_or_create(student=student)
+        
+        return {
+            'progress': {
+                'avg_progress': float(progress_data['avg_progress'] or 0),
+                'completed': progress_data['completed'] or 0,
+                'total': progress_data['total'] or 0,
+                'avg_score': float(progress_data['avg_score'] or 0),
+                'total_time': progress_data['total_time'] or 0
+            },
+            'recent_activities': list(recent_activities.values('assignment__title', 'subject__name', 'score', 'completed', 'last_updated')[:3]),
+            'subjects': subjects_data,
+            'streak': {
+                'current_streak': streak.current_streak,
+                'longest_streak': streak.longest_streak
+            },
+            'student_name': student.name
+        }
+    except Exception as e:
+        print(f"Error getting student context: {e}")
+        return {
+            'progress': {'avg_progress': 0, 'completed': 0, 'total': 0, 'avg_score': 0, 'total_time': 0},
+            'recent_activities': [],
+            'subjects': [],
+            'streak': {'current_streak': 0, 'longest_streak': 0},
+            'student_name': student.name if student else 'Student'
+        }
+
+def generate_intelligent_response(user_message, student, student_data, conversation_context):
+    """Generate context-aware intelligent responses"""
+    
+    # If no message (just opening the assistant)
+    if not user_message:
+        return get_greeting_response(student_data)
+    
+    # Convert message to lowercase for easier matching
+    message = user_message.lower()
+    
+    # Progress inquiries
+    progress_keywords = ['progress', 'how am i doing', 'my progress', 'statistics', 'how am i', 'my stats']
+    if any(keyword in message for keyword in progress_keywords):
+        return get_progress_response(student_data)
+    
+    # Subject-specific inquiries
+    subject_keywords = {
+        'math': ['math', 'mathematics', 'calculus', 'algebra', 'arithmetic'],
+        'science': ['science', 'biology', 'chemistry', 'physics', 'scientific'],
+        'reading': ['reading', 'comprehension', 'literature', 'read'],
+        'writing': ['writing', 'essay', 'composition', 'write'],
+        'arts': ['art', 'arts', 'drawing', 'painting', 'creative'],
+        'social': ['social studies', 'history', 'geography', 'social']
+    }
+    
+    for subject, keywords in subject_keywords.items():
+        if any(keyword in message for keyword in keywords):
+            return get_subject_response(subject, student_data)
+    
+    # Assignment inquiries
+    assignment_keywords = ['assignment', 'homework', 'task', 'exercise', 'work due', 'due date']
+    if any(keyword in message for keyword in assignment_keywords):
+        return get_assignment_response(student_data)
+    
+    # Motivation and encouragement
+    motivation_keywords = ['motivate', 'encourage', 'inspire', 'cheer', 'feeling down', 'discouraged']
+    if any(keyword in message for keyword in motivation_keywords):
+        return get_motivational_response(student_data)
+    
+    # Help and capabilities
+    help_keywords = ['help', 'what can you do', 'capabilities', 'what do you do', 'how can you help']
+    if any(keyword in message for keyword in help_keywords):
+        return get_help_response()
+    
+    # Time and schedule
+    time_keywords = ['time', 'schedule', 'when', 'due', 'deadline', 'when is']
+    if any(keyword in message for keyword in time_keywords):
+        return get_schedule_response(student_data)
+    
+    # Greetings and casual conversation
+    greeting_keywords = ['hello', 'hi', 'hey', 'greetings', 'good morning', 'good afternoon', 'good evening']
+    if any(keyword in message for keyword in greeting_keywords):
+        return get_greeting_response(student_data)
+    
+    # Thank you responses
+    if any(word in message for word in ['thank', 'thanks', 'appreciate']):
+        return get_thankyou_response(student_data)
+    
+    # Default response for unrecognized queries
+    return get_default_response(student_data)
+
+def get_greeting_response(student_data):
+    """Generate greeting response"""
+    greetings = [
+        f"Hello {student_data['student_name']}! I'm your learning assistant. How can I help you today?",
+        f"Hi there {student_data['student_name']}! Ready to continue your learning journey?",
+        f"Greetings {student_data['student_name']}! I'm here to assist with your progress tracking.",
+        f"Welcome back {student_data['student_name']}! What would you like to know about your progress?"
+    ]
+    return random.choice(greetings)
+
+def get_progress_response(student_data):
+    """Generate progress-based response"""
+    progress = student_data['progress']['avg_progress']
+    completed = student_data['progress']['completed']
+    total = student_data['progress']['total']
+    avg_score = student_data['progress']['avg_score']
+    streak = student_data['streak']['current_streak']
+    
+    if progress >= 90:
+        return f"Outstanding progress, {student_data['student_name']}! You've achieved {progress:.1f}% overall completion with {completed} out of {total} assignments. Your average score of {avg_score:.1f}% is excellent! Your {streak}-day learning streak is impressive!"
+    elif progress >= 70:
+        return f"Great work, {student_data['student_name']}! You're at {progress:.1f}% completion with {completed} assignments done. Average score: {avg_score:.1f}%. Keep maintaining your {streak}-day streak!"
+    elif progress >= 50:
+        return f"Good progress, {student_data['student_name']}! You've completed {progress:.1f}% of your work with {completed} assignments. Every step counts toward your learning journey!"
+    else:
+        return f"You're getting started, {student_data['student_name']}! Currently at {progress:.1f}% completion. Don't worry - every expert was once a beginner. Let's work on building momentum!"
+
+def get_subject_response(subject, student_data):
+    """Generate subject-specific response"""
+    subject_data = next((s for s in student_data['subjects'] if subject in s['name'].lower()), None)
+    
+    if subject_data:
+        progress = subject_data['progress']
+        if progress >= 80:
+            return f"You're doing excellent in {subject}! You've achieved {progress:.1f}% progress with {subject_data['completed']} assignments completed. You're mastering this subject!"
+        elif progress >= 60:
+            return f"Good work in {subject}! You're at {progress:.1f}% progress. Keep practicing to reach mastery!"
+        else:
+            return f"In {subject}, you're at {progress:.1f}% progress. Would you like some tips to improve in this area?"
+    else:
+        return f"I don't see much data for {subject} yet. Have you started any assignments in this subject?"
+
+def get_assignment_response(student_data):
+    """Generate assignment-related response"""
+    recent_activities = student_data['recent_activities']
+    
+    if recent_activities:
+        recent = recent_activities[0]
+        subject = recent.get('subject__name', 'your studies')
+        assignment = recent.get('assignment__title', 'an assignment')
+        score = recent.get('score', 'not scored yet')
+        completed = recent.get('completed', False)
+        
+        status = "completed" if completed else "worked on"
+        return f"Your most recent activity was in {subject}. You {status} {assignment} with a score of {score}%."
+    else:
+        return "I don't see any recent assignment activity. Would you like to start a new assignment?"
+
+def get_motivational_response(student_data):
+    """Generate motivational response"""
+    motivational_quotes = [
+        "The beautiful thing about learning is that no one can take it away from you. - B.B. King",
+        "Education is the most powerful weapon which you can use to change the world. - Nelson Mandela",
+        "The more that you read, the more things you will know. The more that you learn, the more places you'll go. - Dr. Seuss",
+        "Don't let what you cannot do interfere with what you can do. - John Wooden",
+        "Your education is a dress rehearsal for a life that is yours to lead. - Nora Ephron"
+    ]
+    
+    streak = student_data['streak']['current_streak']
+    quote = random.choice(motivational_quotes)
+    
+    if streak >= 7:
+        return f"{quote} And wow! Your {streak}-day learning streak is amazing! Your consistency is truly inspiring!"
+    elif streak >= 3:
+        return f"{quote} Keep going! Your {streak}-day streak shows great dedication!"
+    else:
+        return f"{quote} Remember, consistency is key to learning. You've got this!"
+
+def get_help_response():
+    """Generate help response"""
+    return """I can help you with many aspects of your learning journey! Here's what I can do:
+
+• Check your overall progress and statistics
+• Review your performance in specific subjects (Math, Science, Reading, etc.)
+• Tell you about recent assignments and activities
+• Provide motivation and learning tips
+• Answer questions about your schedule and due dates
+• Help you set and track learning goals
+
+Just ask me anything like: 
+"How am I doing in math?" 
+"What's my recent progress?" 
+"Tell me about my assignments"
+
+What would you like to know?"""
+
+def get_schedule_response(student_data):
+    """Generate schedule-related response"""
+    return "I can see you've been consistent with your learning! For detailed schedule information, check your assignment calendar. You're doing great maintaining your learning routine."
+
+def get_thankyou_response(student_data):
+    """Generate thank you response"""
+    responses = [
+        f"You're welcome, {student_data['student_name']}! I'm always here to help with your learning journey.",
+        f"Happy to help, {student_data['student_name']}! Don't hesitate to ask if you need anything else.",
+        f"Anytime, {student_data['student_name']}! Keep up the great work with your studies."
+    ]
+    return random.choice(responses)
+
+def get_default_response(student_data):
+    """Generate default response for unrecognized queries"""
+    responses = [
+        f"I'm not sure I understand that question, {student_data['student_name']}. Try asking about your progress, subjects, or assignments!",
+        f"That's an interesting question! I'm better equipped to help with your learning progress. Try asking about your recent activities or subject performance.",
+        f"I'm here to help with your learning journey, {student_data['student_name']}. You can ask me about your progress, subjects, or how you're doing in your studies!"
+    ]
+    return random.choice(responses)
+
+def update_student_activity(student):
+    """Update student's learning streak and activity"""
+    try:
+        streak, created = LearningStreak.objects.get_or_create(student=student)
+        streak.update_streak()
+        print(f"Updated student activity streak to {streak.current_streak}")  # Debug
+    except Exception as e:
+        print(f"Error updating student activity: {e}")
+
+@login_required
+def update_goal_progress(request, goal_id):
+    """Update goal progress via AJAX"""
+    if request.method == 'POST' and request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        try:
+            goal = get_object_or_404(StudentGoal, id=goal_id)
+            completed = request.POST.get('completed') == 'true'
+            
+            if completed:
+                goal.completed = True
+                goal.completed_date = timezone.now()
+                goal.current_value = goal.target_value
+            else:
+                increment = request.POST.get('increment', 1)
+                goal.current_value = min(goal.target_value, goal.current_value + Decimal(increment))
+                goal.completed = goal.current_value >= goal.target_value
+                if goal.completed:
+                    goal.completed_date = timezone.now()
+            
+            goal.save()
+            
+            return JsonResponse({
+                'success': True,
+                'progress_percentage': goal.progress_percentage(),
+                'completed': goal.completed,
+                'message': 'Goal updated successfully'
+            })
+            
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            })
+    
+    return JsonResponse({'success': False, 'error': 'Invalid request'})
+
+
+
+# views.py - Add real blockchain verification views
+from django.shortcuts import render, get_object_or_404
+from django.http import JsonResponse
+from django.contrib.auth.decorators import login_required
+from .models import Student, BlockchainRecord
+from .blockchain import blockchain_service
+
+@login_required
+def real_blockchain_verification(request, student_id):
+    """Real blockchain verification view"""
+    student = get_object_or_404(Student, id=student_id, created_by=request.user)
+    
+    # Get network info
+    network_info = blockchain_service.get_network_info()
+    
+    # Verify student on blockchain
+    blockchain_verified = student.verify_on_blockchain()
+    
+    # Get blockchain records
+    blockchain_records = BlockchainRecord.objects.filter(student=student).order_by('-block_number')
+    
+    context = {
+        'student': student,
+        'network_info': network_info,
+        'blockchain_verified': blockchain_verified,
+        'blockchain_records': blockchain_records,
+        'total_transactions': blockchain_records.count(),
+        'gas_used_total': sum(r.gas_used or 0 for r in blockchain_records),
+    }
+    
+    return render(request, 'real_blockchain_verification.html', context)
+
+@login_required
+def api_blockchain_network_status(request):
+    """API endpoint for blockchain network status"""
+    network_info = blockchain_service.get_network_info()
+    
+    return JsonResponse({
+        'status': 'connected' if network_info['connected'] else 'disconnected',
+        'network_id': network_info['network_id'],
+        'latest_block': network_info['latest_block'],
+        'owner_address': network_info['owner_address'],
+        'contract_address': network_info['contract_address'],
+        'balance': str(network_info['balance']),
+    })
+
+@login_required
+def api_verify_student_blockchain(request, student_id):
+    """API endpoint to verify student on blockchain"""
+    student = get_object_or_404(Student, id=student_id, created_by=request.user)
+    
+    try:
+        verified = student.verify_on_blockchain()
+        
+        return JsonResponse({
+            'verified': verified,
+            'student_id': student.student_id,
+            'blockchain_id': student.blockchain_id,
+            'last_update': student.last_blockchain_update.isoformat() if student.last_blockchain_update else None,
+        })
+    except Exception as e:
+        return JsonResponse({
+            'verified': False,
+            'error': str(e)
+        }, status=500)

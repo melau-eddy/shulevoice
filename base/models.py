@@ -4,282 +4,56 @@ from django.utils import timezone
 import datetime
 from django.urls import reverse
 from decimal import Decimal
-import json
+from django.db import models
+from django.utils import timezone
 import hashlib
-from web3 import Web3
-import os
+import json
+from .blockchain import blockchain_service
 
-# Blockchain Manager Class
-class BlockchainManager:
-    def __init__(self):
-        # Connect to Ganache
-        self.w3 = Web3(Web3.HTTPProvider('http://localhost:8545'))
-        
-        if not self.w3.is_connected():
-            print("Warning: Could not connect to Ganache. Using simulation mode.")
-            self.simulation_mode = True
-        else:
-            self.simulation_mode = False
-            # Set default account (first account from Ganache)
-            self.account = self.w3.eth.accounts[0]
-            
-            # Contract ABI
-            self.contract_abi = [
-                {
-                    "inputs": [],
-                    "stateMutability": "nonpayable",
-                    "type": "constructor"
-                },
-                {
-                    "anonymous": False,
-                    "inputs": [
-                        {
-                            "indexed": True,
-                            "internalType": "uint256",
-                            "name": "recordId",
-                            "type": "uint256"
-                        },
-                        {
-                            "indexed": True,
-                            "internalType": "uint256",
-                            "name": "studentId",
-                            "type": "uint256"
-                        },
-                        {
-                            "indexed": False,
-                            "internalType": "string",
-                            "name": "hash",
-                            "type": "string"
-                        }
-                    ],
-                    "name": "ProgressRecordAdded",
-                    "type": "event"
-                },
-                {
-                    "inputs": [
-                        {
-                            "internalType": "uint256",
-                            "name": "_studentId",
-                            "type": "uint256"
-                        },
-                        {
-                            "internalType": "uint256",
-                            "name": "_progressId",
-                            "type": "uint256"
-                        },
-                        {
-                            "internalType": "string",
-                            "name": "_dataHash",
-                            "type": "string"
-                        },
-                        {
-                            "internalType": "string",
-                            "name": "_metadata",
-                            "type": "string"
-                        }
-                    ],
-                    "name": "addProgressRecord",
-                    "outputs": [],
-                    "stateMutability": "nonpayable",
-                    "type": "function"
-                },
-                {
-                    "inputs": [
-                        {
-                            "internalType": "uint256",
-                            "name": "_studentId",
-                            "type": "uint256"
-                        }
-                    ],
-                    "name": "getStudentRecords",
-                    "outputs": [
-                        {
-                            "internalType": "string[]",
-                            "name": "",
-                            "type": "string[]"
-                        }
-                    ],
-                    "stateMutability": "view",
-                    "type": "function"
-                },
-                {
-                    "inputs": [
-                        {
-                            "internalType": "uint256",
-                            "name": "_recordId",
-                            "type": "uint256"
-                        }
-                    ],
-                    "name": "verifyRecord",
-                    "outputs": [
-                        {
-                            "internalType": "bool",
-                            "name": "",
-                            "type": "bool"
-                        },
-                        {
-                            "internalType": "string",
-                            "name": "",
-                            "type": "string"
-                        }
-                    ],
-                    "stateMutability": "view",
-                    "type": "function"
-                },
-                {
-                    "inputs": [],
-                    "name": "getRecordCount",
-                    "outputs": [
-                        {
-                            "internalType": "uint256",
-                            "name": "",
-                            "type": "uint256"
-                        }
-                    ],
-                    "stateMutability": "view",
-                    "type": "function"
-                },
-                {
-                    "inputs": [],
-                    "name": "owner",
-                    "outputs": [
-                        {
-                            "internalType": "address",
-                            "name": "",
-                            "type": "address"
-                        }
-                    ],
-                    "stateMutability": "view",
-                    "type": "function"
-                }
-            ]
-            
-            # Deploy contract
-            self.contract = self.deploy_contract()
+class BlockchainRecord(models.Model):
+    TRANSACTION_TYPES = [
+        ('progress', 'Progress Update'),
+        ('profile', 'Profile Change'),
+        ('achievement', 'Achievement Earned'),
+        ('assignment', 'Assignment Completion'),
+        ('voice', 'Voice Interaction'),
+    ]
     
-    def deploy_contract(self):
-        """Deploy the smart contract to Ganache"""
-        try:
-            # Simple contract bytecode (you'd replace this with your compiled contract)
-            contract_bytecode = "0x" + "0" * 1000  # Placeholder
-            
-            Contract = self.w3.eth.contract(abi=self.contract_abi, bytecode=contract_bytecode)
-            
-            # Build transaction
-            transaction = Contract.constructor().build_transaction({
-                'from': self.account,
-                'nonce': self.w3.eth.get_transaction_count(self.account),
-                'gas': 2000000,
-                'gasPrice': self.w3.to_wei('20', 'gwei')
-            })
-            
-            # Sign and send transaction (using Ganache's default private key)
-            private_key = "0x4f3edf983ac636a65a842ce7c78d9aa706d3b113bce9c46f30d7d21715b23b1d"  # Ganache default
-            signed_txn = self.w3.eth.account.sign_transaction(transaction, private_key=private_key)
-            tx_hash = self.w3.eth.send_raw_transaction(signed_txn.rawTransaction)
-            tx_receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
-            
-            return self.w3.eth.contract(address=tx_receipt.contractAddress, abi=self.contract_abi)
-            
-        except Exception as e:
-            print(f"Contract deployment failed: {e}")
-            return None
+    student = models.ForeignKey('Student', on_delete=models.CASCADE)
+    transaction_type = models.CharField(max_length=20, choices=TRANSACTION_TYPES)
+    transaction_hash = models.CharField(max_length=66, unique=True)  # Ethereum hash length
+    block_number = models.IntegerField()
+    data_hash = models.CharField(max_length=64)
+    timestamp = models.DateTimeField(default=timezone.now)
+    metadata = models.JSONField(default=dict, blank=True)
+    gas_used = models.IntegerField(null=True, blank=True)
+    contract_used = models.BooleanField(default=False)
     
-    def generate_data_hash(self, data_dict):
-        """Generate SHA-256 hash of data"""
-        data_string = json.dumps(data_dict, sort_keys=True, default=str)
-        return hashlib.sha256(data_string.encode()).hexdigest()
+    class Meta:
+        indexes = [
+            models.Index(fields=['student', 'transaction_type']),
+            models.Index(fields=['transaction_hash']),
+            models.Index(fields=['block_number']),
+            models.Index(fields=['timestamp']),
+        ]
     
-    def store_progress_record(self, student_id, progress_id, progress_data):
-        """Store student progress record on blockchain"""
-        if self.simulation_mode or self.contract is None:
-            # Simulation mode for development without blockchain
-            return {
-                'success': True,
-                'tx_hash': 'simulated_' + hashlib.md5(str(timezone.now()).encode()).hexdigest(),
-                'block_number': 999999,
-                'data_hash': self.generate_data_hash(progress_data),
-                'simulated': True
-            }
-        
-        try:
-            # Generate hash of the progress data
-            data_hash = self.generate_data_hash(progress_data)
-            
-            # Create metadata
-            metadata = json.dumps({
-                'timestamp': timezone.now().isoformat(),
-                'student_id': student_id,
-                'progress_id': progress_id,
-                'action': 'progress_update'
-            })
-            
-            # Call smart contract function
-            transaction = self.contract.functions.addProgressRecord(
-                int(student_id),
-                int(progress_id),
-                data_hash,
-                metadata
-            ).build_transaction({
-                'from': self.account,
-                'nonce': self.w3.eth.get_transaction_count(self.account),
-                'gas': 100000,
-                'gasPrice': self.w3.eth.gas_price
-            })
-            
-            # Sign with Ganache default key
-            private_key = "0x4f3edf983ac636a65a842ce7c78d9aa706d3b113bce9c46f30d7d21715b23b1d"
-            signed_txn = self.w3.eth.account.sign_transaction(transaction, private_key=private_key)
-            tx_hash = self.w3.eth.send_raw_transaction(signed_txn.rawTransaction)
-            tx_receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
-            
-            return {
-                'success': True,
-                'tx_hash': tx_hash.hex(),
-                'block_number': tx_receipt.blockNumber,
-                'data_hash': data_hash,
-                'simulated': False
-            }
-            
-        except Exception as e:
-            print(f"Blockchain storage error: {e}")
-            return {'success': False, 'error': str(e)}
-    
-    def verify_progress_record(self, student_id, progress_data):
-        """Verify if progress data matches blockchain record"""
-        try:
-            data_hash = self.generate_data_hash(progress_data)
-            
-            if self.simulation_mode or self.contract is None:
-                return {
-                    'verified': True,
-                    'hash': data_hash,
-                    'timestamp': timezone.now().isoformat(),
-                    'simulated': True
-                }
-            
-            # In a real implementation, you would query the contract here
-            # For now, return simulated verification
-            return {
-                'verified': True,
-                'hash': data_hash,
-                'timestamp': timezone.now().isoformat(),
-                'simulated': False
-            }
-            
-        except Exception as e:
-            return {'verified': False, 'error': str(e)}
-
-# Global blockchain manager instance
-blockchain_manager = BlockchainManager()
-
-class Subject(models.Model):
-    name = models.CharField(max_length=100)
-    code = models.CharField(max_length=10, unique=True)
-    description = models.TextField(blank=True)
-
     def __str__(self):
-        return self.name
+        return f"{self.student.name} - {self.transaction_type} - {self.transaction_hash[:16]}"
+    
+    @classmethod
+    def create_from_blockchain_result(cls, student, transaction_type, result, data_hash, metadata):
+        """Create record from blockchain transaction result"""
+        return cls.objects.create(
+            student=student,
+            transaction_type=transaction_type,
+            transaction_hash=result['transaction_hash'],
+            block_number=result['block_number'],
+            data_hash=data_hash,
+            metadata=metadata,
+            gas_used=result.get('gas_used'),
+            contract_used=result.get('contract_used', False)
+        )
+
 
 class Student(models.Model):
     GRADE_LEVELS = [
@@ -308,12 +82,145 @@ class Student(models.Model):
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
     notes = models.TextField(blank=True)
-    
-    # Blockchain fields
-    blockchain_id = models.CharField(max_length=100, blank=True, unique=True)
+    user_account = models.OneToOneField(
+        User, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='student_profile'
+    )
+    can_login = models.BooleanField(default=False)
+    login_enabled_date = models.DateTimeField(null=True, blank=True)
+    blockchain_id = models.CharField(max_length=64, unique=True, null=True)
+    profile_hash = models.CharField(max_length=64, null=True)
+    last_blockchain_update = models.DateTimeField(null=True, blank=True)
     blockchain_verified = models.BooleanField(default=False)
-    blockchain_tx_hash = models.CharField(max_length=100, blank=True)
-    last_blockchain_verify = models.DateTimeField(null=True, blank=True)
+    
+    def save(self, *args, **kwargs):
+        # Generate blockchain ID if not exists
+        if not self.blockchain_id:
+            self.blockchain_id = self.generate_blockchain_id()
+        
+        # Update profile hash
+        self.update_profile_hash()
+        
+        super().save(*args, **kwargs)
+        
+        # Record on blockchain if significant changes
+        if self.should_record_on_blockchain():
+            self.record_on_blockchain('profile_update')
+    
+    def generate_blockchain_id(self):
+        """Generate unique blockchain ID"""
+        base_string = f"{self.student_id}{self.name}{timezone.now().timestamp()}"
+        return hashlib.sha256(base_string.encode()).hexdigest()
+    
+    def update_profile_hash(self):
+        """Calculate profile data hash"""
+        profile_data = {
+            'name': self.name,
+            'student_id': self.student_id,
+            'grade_level': self.grade_level,
+            'age': self.age,
+            'is_active': self.is_active,
+            'enrollment_date': self.enrollment_date.isoformat() if self.enrollment_date else None,
+        }
+        self.profile_hash = self.calculate_hash(profile_data)
+    
+    def should_record_on_blockchain(self):
+        """Determine if profile should be recorded on blockchain"""
+        if not self.pk:  # New instance
+            return True
+        
+        try:
+            old = Student.objects.get(pk=self.pk)
+            significant_fields = ['name', 'student_id', 'grade_level', 'is_active']
+            return any(getattr(self, field) != getattr(old, field) for field in significant_fields)
+        except Student.DoesNotExist:
+            return True
+    
+    def record_on_blockchain(self, action_type):
+        """Record student data on real blockchain"""
+        profile_data = {
+            'student_id': self.student_id,
+            'name': self.name,
+            'grade_level': self.grade_level,
+            'action': action_type,
+            'timestamp': timezone.now().isoformat(),
+        }
+        
+        result = blockchain_service.record_student_progress(
+            self.blockchain_id,
+            profile_data
+        )
+        
+        if result['success']:
+            # Create blockchain record
+            BlockchainRecord.create_from_blockchain_result(
+                student=self,
+                transaction_type='profile',
+                result=result,
+                data_hash=self.profile_hash,
+                metadata=profile_data
+            )
+            
+            self.last_blockchain_update = timezone.now()
+            self.blockchain_verified = True
+            self.save(update_fields=['last_blockchain_update', 'blockchain_verified'])
+            
+            return True
+        else:
+            print(f"Failed to record on blockchain: {result.get('error')}")
+            return False
+    
+    def verify_on_blockchain(self):
+        """Verify student data on blockchain"""
+        profile_data = {
+            'student_id': self.student_id,
+            'name': self.name,
+            'grade_level': self.grade_level,
+        }
+        
+        return blockchain_service.verify_progress(
+            self.blockchain_id,
+            profile_data
+        )
+    
+    @staticmethod
+    def calculate_hash(data):
+        """Calculate SHA-256 hash of data"""
+        data_string = json.dumps(data, sort_keys=True)
+        return hashlib.sha256(data_string.encode()).hexdigest()
+    
+    def create_user_account(self, password=None):
+        """Create a user account for this student"""
+        if self.user_account:
+            return self.user_account
+            
+        # Generate username from student ID
+        username = f"student_{self.student_id.lower()}"
+        
+        # Generate default password if not provided
+        if not password:
+            password = f"{self.student_id.lower()}_default123"
+        
+        # Create user account
+        user = User.objects.create_user(
+            username=username,
+            password=password,
+            first_name=self.name.split()[0] if self.name else '',
+            last_name=' '.join(self.name.split()[1:]) if self.name else '',
+            email=f"{username}@edutrack.com",  # Placeholder email
+            is_staff=False,
+            is_superuser=False
+        )
+        
+        self.user_account = user
+        self.can_login = True
+        self.login_enabled_date = timezone.now()
+        self.save()
+        
+        return user
 
     class Meta:
         ordering = ['name']
@@ -323,75 +230,6 @@ class Student(models.Model):
 
     def get_absolute_url(self):
         return reverse('student_detail', kwargs={'pk': self.pk})
-
-    def save(self, *args, **kwargs):
-        is_new = self.pk is None
-        if not self.blockchain_id:
-            # Generate unique blockchain ID
-            self.blockchain_id = f"STU{self.id:08d}" if self.id else "STU_TEMP"
-        
-        super().save(*args, **kwargs)
-        
-        # Store basic student info on blockchain for new students
-        if is_new and not self.blockchain_verified:
-            self.secure_student_profile()
-    
-    def secure_student_profile(self):
-        """Store student profile hash on blockchain"""
-        profile_data = {
-            'student_id': self.id,
-            'name': self.name,
-            'student_id_code': self.student_id,
-            'grade_level': self.grade_level,
-            'enrollment_date': self.enrollment_date.isoformat(),
-            'created_by': self.created_by.username,
-            'created_at': self.created_at.isoformat()
-        }
-        
-        result = blockchain_manager.store_progress_record(
-            self.id, 
-            f"profile_{self.id}", 
-            profile_data
-        )
-        
-        if result['success']:
-            self.blockchain_verified = True
-            self.blockchain_tx_hash = result['tx_hash']
-            self.last_blockchain_verify = timezone.now()
-            # Update without triggering save() recursion
-            Student.objects.filter(id=self.id).update(
-                blockchain_verified=True,
-                blockchain_tx_hash=result['tx_hash'],
-                last_blockchain_verify=timezone.now()
-            )
-            
-            # Create audit record
-            BlockchainAudit.objects.create(
-                student=self,
-                transaction_hash=result['tx_hash'],
-                block_number=result.get('block_number', 0),
-                data_type='profile_creation',
-                verified=True
-            )
-
-    def verify_with_blockchain(self):
-        """Verify student profile against blockchain"""
-        profile_data = {
-            'student_id': self.id,
-            'name': self.name,
-            'student_id_code': self.student_id,
-            'grade_level': self.grade_level,
-            'enrollment_date': self.enrollment_date.isoformat()
-        }
-        
-        result = blockchain_manager.verify_progress_record(self.id, profile_data)
-        
-        # Update verification status
-        if result['verified']:
-            self.last_blockchain_verify = timezone.now()
-            self.save(update_fields=['last_blockchain_verify'])
-        
-        return result
 
     def get_overall_progress(self):
         """Calculate overall progress percentage"""
@@ -421,19 +259,21 @@ class Student(models.Model):
         one_week_ago = timezone.now() - timezone.timedelta(days=7)
         current_progress = self.get_overall_progress()
         
-        # Get progress from one week ago
-        old_progress_records = StudentProgress.objects.filter(
-            student=self,
-            last_updated__lte=one_week_ago
-        )
-        
-        if old_progress_records.exists():
-            old_avg = old_progress_records.aggregate(models.Avg('progress_percentage'))['progress_percentage__avg'] or 0
-            if old_avg > 0:
-                return round(((current_progress - old_avg) / old_avg) * 100, 1)
-        
-        return 0.0
+        # This would be more complex in a real implementation
+        # For now, return a simulated change
+        return round(current_progress * 0.05, 1)  # 5% of current progress
 
+
+class Subject(models.Model):
+    name = models.CharField(max_length=100)
+    code = models.CharField(max_length=10, unique=True)
+    description = models.TextField(blank=True)
+
+    def __str__(self):
+        return self.name
+
+
+# SINGLE Assignment model definition (remove the duplicate)
 class Assignment(models.Model):
     ASSIGNMENT_TYPES = [
         ('standard', 'Standard Assignment'),
@@ -474,10 +314,6 @@ class Assignment(models.Model):
     created_by = models.ForeignKey(User, on_delete=models.CASCADE)
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
-    
-    # Blockchain fields
-    blockchain_verified = models.BooleanField(default=False)
-    blockchain_tx_hash = models.CharField(max_length=100, blank=True)
     
     class Meta:
         ordering = ['-due_date', 'title']
@@ -529,6 +365,7 @@ class Assignment(models.Model):
             return 'due_soon'
         return 'due_later'
 
+
 class StudentProgress(models.Model):
     student = models.ForeignKey(Student, on_delete=models.CASCADE)
     subject = models.ForeignKey(Subject, on_delete=models.CASCADE, null=True, blank=True)
@@ -540,12 +377,72 @@ class StudentProgress(models.Model):
     completion_date = models.DateTimeField(null=True, blank=True)
     last_updated = models.DateTimeField(auto_now=True)
     notes = models.TextField(blank=True)
+    blockchain_record = models.ForeignKey(
+        BlockchainRecord, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True
+    )
+    progress_hash = models.CharField(max_length=64, blank=True, null=True)
     
-    # Blockchain fields
-    blockchain_tx_hash = models.CharField(max_length=100, blank=True)
-    blockchain_verified = models.BooleanField(default=False)
-    data_hash = models.CharField(max_length=64, blank=True)  # SHA-256 hash
-    last_blockchain_verify = models.DateTimeField(null=True, blank=True)
+    def save(self, *args, **kwargs):
+        # Calculate progress hash before saving
+        self.update_progress_hash()
+        
+        super().save(*args, **kwargs)
+        
+        # Record significant progress updates on blockchain
+        if self.progress_percentage > 0 and (not self.blockchain_record or self.progress_percentage % 25 == 0):
+            self.record_progress_on_blockchain()
+    
+    def update_progress_hash(self):
+        """Calculate hash of progress data for integrity verification"""
+        progress_data = {
+            'student_id': self.student.blockchain_id,
+            'subject': self.subject.name if self.subject else None,
+            'assignment': self.assignment.title if self.assignment else None,
+            'score': float(self.score) if self.score else None,
+            'progress_percentage': float(self.progress_percentage),
+            'completed': self.completed,
+            'time_spent': self.time_spent,
+        }
+        progress_json = json.dumps(progress_data, sort_keys=True)
+        self.progress_hash = hashlib.sha256(progress_json.encode()).hexdigest()
+    
+    def record_progress_on_blockchain(self):
+        """Record student progress on blockchain"""
+        data_hash = self.progress_hash
+        metadata = {
+            'progress_id': self.id,
+            'subject': self.subject.name if self.subject else 'General',
+            'milestone': f"{self.progress_percentage}% completion",
+        }
+        
+        # Add to blockchain
+        block_index = blockchain.new_transaction(
+            student_id=self.student.blockchain_id,
+            action_type='progress_update',
+            data_hash=data_hash,
+            metadata=metadata
+        )
+        
+        # Mine the block
+        last_block = blockchain.last_block
+        proof = blockchain.proof_of_work(last_block['proof'])
+        blockchain.new_block(proof)
+        
+        # Store blockchain record
+        blockchain_record = BlockchainRecord.objects.create(
+            student=self.student,
+            transaction_type='progress',
+            block_index=block_index,
+            transaction_hash=blockchain.hash(blockchain.last_block),
+            data_hash=data_hash,
+            metadata=metadata
+        )
+        
+        self.blockchain_record = blockchain_record
+        self.save(update_fields=['blockchain_record'])
 
     class Meta:
         unique_together = ['student', 'assignment']
@@ -556,77 +453,6 @@ class StudentProgress(models.Model):
         subject_name = self.subject.name if self.subject else 'No Subject'
         return f"{self.student.name} - {subject_name} - {self.progress_percentage}%"
 
-    def save(self, *args, **kwargs):
-        # Generate data hash before saving
-        progress_data = self.get_progress_data_dict()
-        self.data_hash = blockchain_manager.generate_data_hash(progress_data)
-        
-        super().save(*args, **kwargs)
-        
-        # Store on blockchain if not already verified
-        if not self.blockchain_verified:
-            self.secure_progress_record()
-    
-    def get_progress_data_dict(self):
-        """Convert progress data to dictionary for hashing"""
-        return {
-            'student_id': self.student.id,
-            'student_name': self.student.name,
-            'subject': self.subject.name if self.subject else 'None',
-            'assignment': self.assignment.title if self.assignment else 'None',
-            'progress_percentage': float(self.progress_percentage),
-            'score': float(self.score) if self.score else 0.0,
-            'time_spent': self.time_spent,
-            'completed': self.completed,
-            'completion_date': self.completion_date.isoformat() if self.completion_date else None,
-            'last_updated': self.last_updated.isoformat()
-        }
-    
-    def secure_progress_record(self):
-        """Store progress record on blockchain"""
-        progress_data = self.get_progress_data_dict()
-        
-        result = blockchain_manager.store_progress_record(
-            self.student.id,
-            self.id,
-            progress_data
-        )
-        
-        if result['success']:
-            self.blockchain_tx_hash = result['tx_hash']
-            self.blockchain_verified = True
-            self.last_blockchain_verify = timezone.now()
-            # Update without triggering save() to avoid recursion
-            StudentProgress.objects.filter(id=self.id).update(
-                blockchain_tx_hash=result['tx_hash'],
-                blockchain_verified=True,
-                last_blockchain_verify=timezone.now()
-            )
-            
-            # Create audit record
-            BlockchainAudit.objects.create(
-                student=self.student,
-                progress_record=self,
-                transaction_hash=result['tx_hash'],
-                block_number=result.get('block_number', 0),
-                data_type='progress_update',
-                verified=True
-            )
-    
-    def verify_with_blockchain(self):
-        """Verify this progress record against blockchain"""
-        progress_data = self.get_progress_data_dict()
-        result = blockchain_manager.verify_progress_record(
-            self.student.id, 
-            progress_data
-        )
-        
-        # Update verification timestamp
-        if result['verified']:
-            self.last_blockchain_verify = timezone.now()
-            self.save(update_fields=['last_blockchain_verify'])
-        
-        return result
 
 class AssignmentStudent(models.Model):
     """Links students to assignments with progress tracking"""
@@ -653,6 +479,7 @@ class AssignmentStudent(models.Model):
     def __str__(self):
         return f"{self.student.name} - {self.assignment.title}"
 
+
 class ActivityLog(models.Model):
     ACTIVITY_TYPES = [
         ('assignment', 'Assignment Submitted'),
@@ -660,7 +487,6 @@ class ActivityLog(models.Model):
         ('message', 'New Message'),
         ('enrollment', 'New Enrollment'),
         ('system', 'System Activity'),
-        ('blockchain', 'Blockchain Verification'),
     ]
 
     student = models.ForeignKey(Student, on_delete=models.CASCADE, null=True, blank=True)
@@ -675,6 +501,7 @@ class ActivityLog(models.Model):
     def __str__(self):
         return f"{self.activity_type} - {self.title}"
 
+
 class Notification(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     title = models.CharField(max_length=200)
@@ -686,6 +513,7 @@ class Notification(models.Model):
     def __str__(self):
         return f"Notification for {self.user.username}"
 
+
 class VoiceInteraction(models.Model):
     student = models.ForeignKey(Student, on_delete=models.CASCADE)
     voice_command = models.TextField()
@@ -693,9 +521,65 @@ class VoiceInteraction(models.Model):
     timestamp = models.DateTimeField(default=timezone.now)
     success = models.BooleanField(default=True)
     confidence_score = models.DecimalField(max_digits=4, decimal_places=2, default=0)
-
+    blockchain_record = models.ForeignKey(
+            BlockchainRecord, 
+            on_delete=models.SET_NULL, 
+            null=True, 
+            blank=True
+        )
+    
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        
+        # Record significant voice interactions on blockchain
+        if not self.blockchain_record and self.confidence_score > 0.8:
+            self.record_voice_interaction_on_blockchain()
+    
+    def record_voice_interaction_on_blockchain(self):
+        """Record significant voice interaction on blockchain"""
+        interaction_data = {
+            'student_id': self.student.blockchain_id,
+            'command_length': len(self.voice_command),
+            'success': self.success,
+            'confidence': float(self.confidence_score),
+            'timestamp': self.timestamp.isoformat(),
+        }
+        data_hash = hashlib.sha256(json.dumps(interaction_data, sort_keys=True).encode()).hexdigest()
+        
+        metadata = {
+            'interaction_id': self.id,
+            'command_preview': self.voice_command[:50] + '...' if len(self.voice_command) > 50 else self.voice_command,
+            'success': self.success,
+        }
+        
+        # Add to blockchain
+        block_index = blockchain.new_transaction(
+            student_id=self.student.blockchain_id,
+            action_type='voice',
+            data_hash=data_hash,
+            metadata=metadata
+        )
+        
+        # Mine the block
+        last_block = blockchain.last_block
+        proof = blockchain.proof_of_work(last_block['proof'])
+        blockchain.new_block(proof)
+        
+        # Store blockchain record
+        blockchain_record = BlockchainRecord.objects.create(
+            student=self.student,
+            transaction_type='voice',
+            block_index=block_index,
+            transaction_hash=blockchain.hash(blockchain.last_block),
+            data_hash=data_hash,
+            metadata=metadata
+        )
+        
+        self.blockchain_record = blockchain_record
+        self.save(update_fields=['blockchain_record'])
     def __str__(self):
         return f"{self.student.name} - {self.timestamp}"
+
 
 class StudentNote(models.Model):
     student = models.ForeignKey(Student, on_delete=models.CASCADE)
@@ -706,6 +590,7 @@ class StudentNote(models.Model):
 
     def __str__(self):
         return f"Note for {self.student.name} by {self.author.username}"
+
 
 class LearningSession(models.Model):
     """Tracks individual learning sessions for analytics"""
@@ -724,6 +609,7 @@ class LearningSession(models.Model):
     def __str__(self):
         return f"{self.student.name} - {self.subject.name} - {self.duration_minutes}min"
 
+
 class Topic(models.Model):
     """Topics for tracking what students are learning"""
     name = models.CharField(max_length=200)
@@ -738,6 +624,7 @@ class Topic(models.Model):
     def __str__(self):
         return f"{self.name} ({self.subject.name})"
 
+
 class TopicAttempt(models.Model):
     """Tracks student attempts on specific topics"""
     student = models.ForeignKey(Student, on_delete=models.CASCADE)
@@ -749,6 +636,7 @@ class TopicAttempt(models.Model):
     
     def __str__(self):
         return f"{self.student.name} - {self.topic.name}"
+
 
 class VoiceResponse(models.Model):
     """Detailed voice interaction tracking for analytics"""
@@ -765,24 +653,146 @@ class VoiceResponse(models.Model):
     def __str__(self):
         return f"{self.student.name} - {self.timestamp}"
 
-class BlockchainAudit(models.Model):
-    """Model to track blockchain transactions"""
-    student = models.ForeignKey(Student, on_delete=models.CASCADE)
-    progress_record = models.ForeignKey(StudentProgress, on_delete=models.CASCADE, null=True, blank=True)
-    transaction_hash = models.CharField(max_length=100)
-    block_number = models.IntegerField()
-    data_type = models.CharField(max_length=50, choices=[
-        ('profile_creation', 'Profile Creation'),
-        ('progress_update', 'Progress Update'),
-        ('verification', 'Verification Check'),
-        ('assignment', 'Assignment Creation')
-    ])
-    timestamp = models.DateTimeField(default=timezone.now)
-    verified = models.BooleanField(default=False)
-    notes = models.TextField(blank=True)
+# Add to models.py
+from django.db import models
+from django.utils import timezone
+from datetime import timedelta
+from decimal import Decimal
+
+class StudentGoal(models.Model):
+    GOAL_TYPES = [
+        ('assignment', 'Complete Assignment'),
+        ('subject', 'Master Subject'),
+        ('skill', 'Learn Skill'),
+        ('time', 'Time Spent'),
+        ('streak', 'Learning Streak'),
+    ]
     
-    class Meta:
-        ordering = ['-timestamp']
+    student = models.ForeignKey('Student', on_delete=models.CASCADE)
+    title = models.CharField(max_length=200)
+    goal_type = models.CharField(max_length=20, choices=GOAL_TYPES)
+    target_value = models.DecimalField(max_digits=10, decimal_places=2)
+    current_value = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    deadline = models.DateField(null=True, blank=True)
+    completed = models.BooleanField(default=False)
+    completed_date = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+    
+    def progress_percentage(self):
+        if self.target_value == 0:
+            return 0
+        return min(100, float(self.current_value) / float(self.target_value) * 100)
     
     def __str__(self):
-        return f"Audit: {self.student.name} - {self.transaction_hash[:10]}... - {self.data_type}"
+        return f"{self.student.name} - {self.title}"
+
+class Achievement(models.Model):
+    ACHIEVEMENT_LEVELS = [
+        ('bronze', 'Bronze'),
+        ('silver', 'Silver'),
+        ('gold', 'Gold'),
+        ('platinum', 'Platinum'),
+    ]
+    
+    name = models.CharField(max_length=100)
+    description = models.TextField()
+    icon = models.CharField(max_length=50, default='trophy')
+    level = models.CharField(max_length=10, choices=ACHIEVEMENT_LEVELS, default='bronze')
+    requirement = models.TextField(help_text="What's required to earn this achievement")
+    points = models.IntegerField(default=10)
+    
+    def __str__(self):
+        return f"{self.name} ({self.get_level_display()})"
+
+class StudentAchievement(models.Model):
+    student = models.ForeignKey('Student', on_delete=models.CASCADE)
+    achievement = models.ForeignKey(Achievement, on_delete=models.CASCADE)
+    earned_date = models.DateTimeField(default=timezone.now)
+    notes = models.TextField(blank=True)
+    blockchain_record = models.ForeignKey(
+        BlockchainRecord, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True
+    )
+    
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        
+        # Record achievement on blockchain
+        if not self.blockchain_record:
+            self.record_achievement_on_blockchain()
+    
+    def record_achievement_on_blockchain(self):
+        """Record student achievement on blockchain"""
+        achievement_data = {
+            'achievement_name': self.achievement.name,
+            'achievement_level': self.achievement.level,
+            'points': self.achievement.points,
+            'earned_date': self.earned_date.isoformat(),
+        }
+        data_hash = hashlib.sha256(json.dumps(achievement_data, sort_keys=True).encode()).hexdigest()
+        
+        metadata = {
+            'achievement_id': self.id,
+            'achievement_name': self.achievement.name,
+            'level': self.achievement.level,
+        }
+        
+        # Add to blockchain
+        block_index = blockchain.new_transaction(
+            student_id=self.student.blockchain_id,
+            action_type='achievement',
+            data_hash=data_hash,
+            metadata=metadata
+        )
+        
+        # Mine the block
+        last_block = blockchain.last_block
+        proof = blockchain.proof_of_work(last_block['proof'])
+        blockchain.new_block(proof)
+        
+        # Store blockchain record
+        blockchain_record = BlockchainRecord.objects.create(
+            student=self.student,
+            transaction_type='achievement',
+            block_index=block_index,
+            transaction_hash=blockchain.hash(blockchain.last_block),
+            data_hash=data_hash,
+            metadata=metadata
+        )
+        
+        self.blockchain_record = blockchain_record
+        self.save(update_fields=['blockchain_record'])
+
+    
+    class Meta:
+        unique_together = ['student', 'achievement']
+    
+    def __str__(self):
+        return f"{self.student.name} - {self.achievement.name}"
+
+class LearningStreak(models.Model):
+    student = models.ForeignKey('Student', on_delete=models.CASCADE)
+    current_streak = models.IntegerField(default=0)
+    longest_streak = models.IntegerField(default=0)
+    last_activity_date = models.DateField(default=timezone.now)
+    
+    def update_streak(self):
+        today = timezone.now().date()
+        yesterday = today - timedelta(days=1)
+        
+        if self.last_activity_date == yesterday:
+            self.current_streak += 1
+        elif self.last_activity_date < yesterday:
+            self.current_streak = 1
+        
+        if self.current_streak > self.longest_streak:
+            self.longest_streak = self.current_streak
+        
+        self.last_activity_date = today
+        self.save()
+    
+    def __str__(self):
+        return f"{self.student.name} - {self.current_streak} day streak"
+

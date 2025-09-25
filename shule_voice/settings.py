@@ -11,11 +11,22 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 from pathlib import Path
+import os
+from dotenv import load_dotenv
 
+load_dotenv()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# settings.py
 
+
+# Blockchain settings
+GANACHE_URL = os.getenv('GANACHE_URL', 'http://localhost:7545')
+CONTRACT_OWNER_PRIVATE_KEY = os.getenv('CONTRACT_OWNER_PRIVATE_KEY')
+BLOCKCHAIN_NETWORK = os.getenv('BLOCKCHAIN_NETWORK', 'ganache')
+GAS_LIMIT = int(os.getenv('GAS_LIMIT', 3000000))
+GAS_PRICE = int(os.getenv('GAS_PRICE', 20))
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
@@ -31,6 +42,7 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
+    'jazzmin',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',

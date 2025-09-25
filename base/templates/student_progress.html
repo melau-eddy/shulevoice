@@ -1,0 +1,1618 @@
+{% extends 'student_base.html' %}
+{% load static %}
+
+{% block title %}EduTrack Pro | My Progress{% endblock %}
+
+{% block page_title %}My Learning Progress{% endblock %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --math-color: #FF6B6B;
+        --science-color: #4ECDC4;
+        --reading-color: #FFD166;
+        --writing-color: #06D6A0;
+        --arts-color: #A663CC;
+        --social-color: #FF9E64;
+    }
+
+    .student-progress {
+        padding: 2rem;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    /* Welcome Section */
+    .welcome-section {
+        background: white;
+        border-radius: 20px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+        border-left: 6px solid var(--primary);
+    }
+
+    .welcome-section h1 {
+        font-size: 2.5rem;
+        margin-bottom: 1rem;
+        color: var(--primary);
+    }
+
+    .welcome-section p {
+        font-size: 1.2rem;
+        color: var(--gray);
+        max-width: 800px;
+        margin: 0 auto 1.5rem;
+    }
+
+    .motivational-message {
+        background: linear-gradient(135deg, var(--primary), var(--accent));
+        color: white;
+        padding: 1rem 2rem;
+        border-radius: 50px;
+        font-size: 1.1rem;
+        display: inline-block;
+        box-shadow: 0 5px 15px rgba(67, 97, 238, 0.3);
+    }
+
+    /* Progress Overview */
+    .progress-overview {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    @media (max-width: 968px) {
+        .progress-overview {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .progress-card {
+        background: white;
+        border-radius: 20px;
+        padding: 2rem;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+    }
+
+    .section-title {
+        font-size: 1.5rem;
+        color: var(--primary);
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .section-title i {
+        color: var(--accent);
+    }
+
+    /* Overall Progress Circle */
+    .overall-progress {
+        text-align: center;
+        padding: 1rem;
+    }
+
+    .progress-circle {
+        width: 200px;
+        height: 200px;
+        margin: 0 auto 1.5rem;
+        position: relative;
+    }
+
+    .progress-bg {
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        background: var(--light-gray);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .progress-fill {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        background: conic-gradient(var(--primary) 0% {{ overall_progress }}%, var(--light-gray) {{ overall_progress }}% 100%);
+        mask: radial-gradient(white 55%, transparent 56%);
+        -webkit-mask: radial-gradient(white 55%, transparent 56%);
+    }
+
+    .progress-text {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+    }
+
+    .progress-value {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: var(--primary);
+    }
+
+    .progress-label {
+        font-size: 1rem;
+        color: var(--gray);
+    }
+
+    .progress-stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1rem;
+        margin-top: 2rem;
+    }
+
+    @media (max-width: 768px) {
+        .progress-stats {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .stat {
+        text-align: center;
+        padding: 1.5rem 1rem;
+        background: var(--light);
+        border-radius: 15px;
+        transition: transform 0.3s ease;
+    }
+
+    .stat:hover {
+        transform: translateY(-2px);
+    }
+
+    .stat-value {
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--primary);
+        margin-bottom: 0.5rem;
+    }
+
+    .stat-label {
+        font-size: 0.9rem;
+        color: var(--gray);
+    }
+
+    /* Subjects Grid */
+    .subjects-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .subject-card {
+        background: white;
+        border-radius: 15px;
+        padding: 1.5rem;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+        text-align: center;
+        transition: transform 0.3s ease;
+        cursor: pointer;
+        border-top: 5px solid;
+    }
+
+    .subject-card:hover {
+        transform: translateY(-5px);
+    }
+
+    .subject-icon {
+        width: 70px;
+        height: 70px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2rem;
+        color: white;
+        margin: 0 auto 1rem;
+    }
+
+    .subject-card h3 {
+        font-size: 1.3rem;
+        margin-bottom: 1rem;
+        color: var(--dark);
+    }
+
+    .progress-container {
+        background: var(--light-gray);
+        border-radius: 10px;
+        height: 12px;
+        margin-bottom: 0.5rem;
+        overflow: hidden;
+    }
+
+    .subject-progress-bar {
+        height: 100%;
+        border-radius: 10px;
+        transition: width 0.5s ease;
+    }
+
+    .progress-percent {
+        font-weight: 600;
+        color: var(--dark);
+        font-size: 1.1rem;
+    }
+
+    .progress-detail {
+        font-size: 0.9rem;
+        color: var(--gray);
+        margin-top: 0.3rem;
+    }
+
+    /* Recent Activity */
+    .activity-list {
+        list-style: none;
+    }
+
+    .activity-item {
+        display: flex;
+        gap: 1rem;
+        padding: 1.5rem;
+        border-bottom: 1px solid var(--light-gray);
+        align-items: flex-start;
+        transition: background-color 0.3s ease;
+    }
+
+    .activity-item:hover {
+        background-color: var(--light);
+    }
+
+    .activity-item:last-child {
+        border-bottom: none;
+    }
+
+    .activity-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        background: var(--light);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--primary);
+        font-size: 1.3rem;
+        flex-shrink: 0;
+    }
+
+    .activity-content {
+        flex: 1;
+    }
+
+    .activity-content h4 {
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+        color: var(--dark);
+    }
+
+    .activity-content p {
+        color: var(--gray);
+        font-size: 0.9rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .activity-time {
+        color: var(--gray);
+        font-size: 0.8rem;
+    }
+
+    /* Achievements */
+    .achievements-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1.5rem;
+    }
+
+    .achievement-card {
+        background: var(--light);
+        border-radius: 15px;
+        padding: 1.5rem;
+        text-align: center;
+        transition: transform 0.3s ease;
+        min-height: 200px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+
+    .achievement-card.earned {
+        background: linear-gradient(135deg, var(--primary), var(--accent));
+        color: white;
+        box-shadow: 0 5px 15px rgba(67, 97, 238, 0.3);
+    }
+
+    .achievement-card:hover {
+        transform: scale(1.05);
+    }
+
+    .achievement-icon {
+        width: 70px;
+        height: 70px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.8rem;
+        margin: 0 auto 1rem;
+    }
+
+    .achievement-card.earned .achievement-icon {
+        background: rgba(255, 255, 255, 0.3);
+    }
+
+    .achievement-card h4 {
+        font-size: 1.1rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .achievement-card p {
+        font-size: 0.8rem;
+        opacity: 0.9;
+    }
+
+    /* Goals */
+    .goals-list {
+        list-style: none;
+    }
+
+    .goal-item {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1.5rem;
+        border-bottom: 1px solid var(--light-gray);
+        transition: background-color 0.3s ease;
+    }
+
+    .goal-item:hover {
+        background-color: var(--light);
+    }
+
+    .goal-item:last-child {
+        border-bottom: none;
+    }
+
+    .goal-checkbox {
+        width: 28px;
+        height: 28px;
+        border: 2px solid var(--light-gray);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        flex-shrink: 0;
+        transition: all 0.3s ease;
+    }
+
+    .goal-checkbox.checked {
+        background: var(--success);
+        border-color: var(--success);
+        color: white;
+    }
+
+    .goal-content {
+        flex: 1;
+    }
+
+    .goal-content h4 {
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+        color: var(--dark);
+    }
+
+    .goal-content p {
+        color: var(--gray);
+        font-size: 0.9rem;
+    }
+
+    .goal-progress {
+        width: 120px;
+        flex-shrink: 0;
+    }
+
+    .goal-progress-bar {
+        height: 8px;
+        background: var(--light-gray);
+        border-radius: 4px;
+        overflow: hidden;
+        margin-bottom: 0.5rem;
+    }
+
+    .goal-progress-fill {
+        height: 100%;
+        background: var(--primary);
+        border-radius: 4px;
+        transition: width 0.5s ease;
+    }
+
+    .goal-progress-text {
+        font-size: 0.8rem;
+        color: var(--gray);
+        text-align: center;
+    }
+
+    /* Voice Assistant */
+    .voice-assistant {
+        position: fixed;
+        bottom: 2rem;
+        right: 2rem;
+        z-index: 1000;
+    }
+
+    .voice-btn {
+        width: 70px;
+        height: 70px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--primary), var(--accent));
+        color: white;
+        border: none;
+        font-size: 1.5rem;
+        cursor: pointer;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        transition: transform 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .voice-btn:hover {
+        transform: scale(1.1);
+    }
+
+    .voice-btn.listening {
+        animation: pulse 1.5s infinite;
+        background: linear-gradient(135deg, var(--success), #22c55e);
+    }
+
+    @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.1); }
+        100% { transform: scale(1); }
+    }
+
+    /* Two-column layout for lower sections */
+    .progress-lower {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 2rem;
+        margin-bottom: 2rem;
+    }
+
+    @media (max-width: 968px) {
+        .progress-lower {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    /* Empty states */
+    .empty-state {
+        text-align: center;
+        padding: 3rem;
+        color: var(--gray);
+    }
+
+    .empty-state i {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+        opacity: 0.5;
+    }
+
+    @media (max-width: 768px) {
+    .student-progress {
+        padding: 1rem;
+    }
+    
+    .welcome-section h1 {
+        font-size: 2rem;
+    }
+    
+    .progress-overview {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    .progress-circle {
+        width: 150px;
+        height: 150px;
+    }
+    
+    .subjects-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .progress-lower {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    .voice-assistant {
+        bottom: 1rem;
+        right: 1rem;
+    }
+    
+    .voice-btn {
+        width: 60px;
+        height: 60px;
+        font-size: 1.3rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .progress-card {
+        padding: 1rem;
+    }
+    
+    .section-title {
+        font-size: 1.3rem;
+    }
+    
+    .stat-value {
+        font-size: 1.5rem;
+    }
+    
+    .activity-item {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .goal-item {
+        flex-direction: column;
+        text-align: center;
+        gap: 0.5rem;
+    }
+    
+    .goal-progress {
+        width: 100%;
+    }
+}
+
+.student-welcome {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 15px;
+        margin-bottom: 2rem;
+        text-align: center;
+    }
+    
+    .student-welcome h1 {
+        margin-bottom: 0.5rem;
+        font-size: 2.5rem;
+    }
+    
+    .student-welcome p {
+        font-size: 1.2rem;
+        opacity: 0.9;
+    }
+    
+    .student-restricted {
+        background: #fff3cd;
+        border: 1px solid #ffeaa7;
+        border-radius: 10px;
+        padding: 1rem;
+        margin: 1rem 0;
+        text-align: center;
+        color: #856404;
+    }
+    
+    .student-avatar {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+/* Voice Assistant Styles */
+.voice-assistant {
+        position: fixed;
+        bottom: 2rem;
+        right: 2rem;
+        z-index: 10000;
+    }
+
+    .voice-btn {
+        width: 70px;
+        height: 70px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #4361ee, #3a0ca3);
+        color: white;
+        border: none;
+        font-size: 1.5rem;
+        cursor: pointer;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .voice-btn:hover {
+        transform: scale(1.1);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.4);
+    }
+
+    .voice-btn.listening {
+        background: linear-gradient(135deg, #f72585, #b5179e);
+        animation: pulse 1.5s infinite;
+    }
+
+    .voice-btn.speaking {
+        background: linear-gradient(135deg, #4cc9f0, #4895ef);
+    }
+
+    .voice-panel {
+        position: absolute;
+        bottom: 90px;
+        right: 0;
+        width: 400px;
+        max-width: 90vw;
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 15px 40px rgba(0,0,0,0.2);
+        border: 1px solid #e0e0e0;
+        display: none;
+        z-index: 10001;
+        max-height: 500px;
+        overflow: hidden;
+    }
+
+    .voice-panel.active {
+        display: flex;
+        flex-direction: column;
+        animation: slideUp 0.3s ease;
+    }
+
+    .voice-header {
+        background: linear-gradient(135deg, #4361ee, #3a0ca3);
+        color: white;
+        padding: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .voice-avatar {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+    }
+
+    .voice-messages {
+        flex: 1;
+        padding: 1rem;
+        overflow-y: auto;
+        max-height: 300px;
+        background: #f8f9fa;
+    }
+
+    .message {
+        margin-bottom: 1rem;
+        padding: 0.8rem 1rem;
+        border-radius: 15px;
+        font-size: 0.9rem;
+        line-height: 1.4;
+        max-width: 85%;
+        animation: messageSlide 0.3s ease;
+    }
+
+    .message.user {
+        background: #4361ee;
+        color: white;
+        margin-left: auto;
+        border-bottom-right-radius: 5px;
+    }
+
+    .message.assistant {
+        background: white;
+        border: 1px solid #e0e0e0;
+        margin-right: auto;
+        border-bottom-left-radius: 5px;
+    }
+
+    .message.typing {
+        font-style: italic;
+        color: #666;
+    }
+
+    .voice-input-area {
+        padding: 1rem;
+        border-top: 1px solid #e0e0e0;
+        background: white;
+    }
+
+    .voice-input-container {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+    }
+
+    .voice-input {
+        flex: 1;
+        padding: 0.8rem 1rem;
+        border: 1px solid #ddd;
+        border-radius: 25px;
+        outline: none;
+        font-size: 0.9rem;
+    }
+
+    .voice-input:focus {
+        border-color: #4361ee;
+    }
+
+    .voice-controls {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .control-btn {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        border: none;
+        background: #f0f0f0;
+        color: #666;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s ease;
+    }
+
+    .control-btn:hover {
+        background: #4361ee;
+        color: white;
+    }
+
+    .control-btn.active {
+        background: #4361ee;
+        color: white;
+    }
+
+    .listening-indicator {
+        display: none;
+        text-align: center;
+        padding: 0.5rem;
+        background: #fff3cd;
+        color: #856404;
+        font-size: 0.8rem;
+        border-radius: 10px;
+        margin-top: 0.5rem;
+    }
+
+    .listening-indicator.active {
+        display: block;
+        animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.1); }
+        100% { transform: scale(1); }
+    }
+
+    @keyframes slideUp {
+        from { transform: translateY(20px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+    }
+
+    @keyframes messageSlide {
+        from { transform: translateY(10px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    .recording-dots {
+        display: inline-flex;
+        gap: 3px;
+        margin-right: 0.5rem;
+    }
+
+    .recording-dots span {
+        width: 6px;
+        height: 6px;
+        background: currentColor;
+        border-radius: 50%;
+        animation: bounce 1.4s infinite ease-in-out;
+    }
+
+    .recording-dots span:nth-child(1) { animation-delay: -0.32s; }
+    .recording-dots span:nth-child(2) { animation-delay: -0.16s; }
+
+    @keyframes bounce {
+        0%, 80%, 100% { transform: scale(0); }
+        40% { transform: scale(1); }
+    }
+
+    /* Responsive design */
+    @media (max-width: 768px) {
+        .voice-panel {
+            width: 350px;
+            right: -50px;
+        }
+        
+        .voice-assistant {
+            bottom: 1rem;
+            right: 1rem;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .voice-panel {
+            width: 300px;
+            right: -80px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="student-progress">
+    <!-- Welcome Section -->
+    <section class="welcome-section">
+        <h1>Hello, {{ request.username }}! 👋</h1>
+        <p>Welcome to your personal progress dashboard. Here's how you're doing on your learning journey.</p>
+        <div class="motivational-message">
+            <i class="fas fa-star"></i> {{ motivational_message }}
+        </div>
+    </section>
+    <div class="student-restricted">
+        <i class="fas fa-info-circle"></i>
+        <strong>Student Account:</strong> You can only view your own progress and account settings.
+    </div>
+
+    <!-- Progress Overview -->
+    <div class="progress-overview">
+        <!-- Overall Progress -->
+        <div class="progress-card">
+            <h2 class="section-title"><i class="fas fa-chart-line"></i> My Overall Progress</h2>
+            <div class="overall-progress">
+                <div class="progress-circle">
+                    <div class="progress-bg">
+                        <div class="progress-fill"></div>
+                    </div>
+                    <div class="progress-text">
+                        <div class="progress-value">{{ overall_progress }}%</div>
+                        <div class="progress-label">Overall Complete</div>
+                    </div>
+                </div>
+                <div class="progress-stats">
+                    <div class="stat">
+                        <div class="stat-value">{{ completed_assignments }}</div>
+                        <div class="stat-label">Assignments Completed</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">{{ avg_score }}%</div>
+                        <div class="stat-label">Average Score</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">{{ total_time_hours }}h</div>
+                        <div class="stat-label">Total Learning Time</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Learning Stats -->
+        <div class="progress-card">
+            <h2 class="section-title"><i class="fas fa-trophy"></i> Learning Stats</h2>
+            <div class="overall-progress">
+                <div class="progress-circle">
+                    <div class="progress-bg">
+                        <div class="progress-fill" style="background: conic-gradient(#FFD166 0% 65%, var(--light-gray) 65% 100%);"></div>
+                    </div>
+                    <div class="progress-text">
+                        <div class="progress-value">#{{ class_rank }}</div>
+                        <div class="progress-label">Class Rank</div>
+                    </div>
+                </div>
+                <div class="progress-stats">
+                    <div class="stat">
+                        <div class="stat-value">{{ learning_streak }}</div>
+                        <div class="stat-label">Day Streak</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">{{ earned_achievements|length }}</div>
+                        <div class="stat-label">Badges Earned</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Subjects Progress -->
+    <section class="progress-card">
+        <h2 class="section-title"><i class="fas fa-book-open"></i> My Subjects Progress</h2>
+        <div class="subjects-grid">
+            {% for subject_data in subjects_progress %}
+            <div class="subject-card" style="border-color: {{ subject_data.color }};" 
+                 onclick="viewSubjectDetails('{{ subject_data.subject.name }}')">
+                <div class="subject-icon" style="background: {{ subject_data.color }};">
+                    <i class="fas fa-{{ subject_data.subject.name|lower }}"></i>
+                </div>
+                <h3>{{ subject_data.subject.name }}</h3>
+                <div class="progress-container">
+                    <div class="subject-progress-bar" style="width: {{ subject_data.progress }}%; background: {{ subject_data.color }};"></div>
+                </div>
+                <div class="progress-percent">{{ subject_data.progress }}% Complete</div>
+                <div class="progress-detail">{{ subject_data.completed }}/{{ subject_data.total }} assignments</div>
+            </div>
+            {% empty %}
+            <div class="empty-state">
+                <i class="fas fa-book"></i>
+                <h3>No Subject Progress Yet</h3>
+                <p>Start your first assignment to see progress here!</p>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <!-- Lower Sections Grid -->
+    <div class="progress-lower">
+        <!-- Recent Activity -->
+        <section class="progress-card">
+            <h2 class="section-title"><i class="fas fa-history"></i> Recent Activity</h2>
+            {% if recent_activities %}
+            <ul class="activity-list">
+                {% for activity in recent_activities %}
+                <li class="activity-item">
+                    <div class="activity-icon" style="background: {{ activity.subject_color }}20; color: {{ activity.subject_color }};">
+                        <i class="fas fa-{{ activity.icon }}"></i>
+                    </div>
+                    <div class="activity-content">
+                        <h4>{{ activity.title }}</h4>
+                        <p>{{ activity.description }}</p>
+                        <div class="activity-time">{{ activity.timestamp|timesince }} ago</div>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-clock"></i>
+                <h3>No Recent Activity</h3>
+                <p>Your activity will appear here as you learn!</p>
+            </div>
+            {% endif %}
+        </section>
+
+        <!-- Current Goals -->
+        <section class="progress-card">
+            <h2 class="section-title"><i class="fas fa-bullseye"></i> My Learning Goals</h2>
+            {% if current_goals %}
+            <ul class="goals-list">
+                {% for goal in current_goals %}
+                <li class="goal-item">
+                    <div class="goal-checkbox {% if goal.completed %}checked{% endif %}" 
+                         onclick="toggleGoal({{ goal.id }})">
+                        {% if goal.completed %}<i class="fas fa-check"></i>{% endif %}
+                    </div>
+                    <div class="goal-content">
+                        <h4>{{ goal.title }}</h4>
+                        <p>{{ goal.goal_type|title }} Goal • Due: {{ goal.deadline|date:"M d" }}</p>
+                    </div>
+                    <div class="goal-progress">
+                        <div class="goal-progress-bar">
+                            <div class="goal-progress-fill" style="width: {{ goal.progress_percentage }}%"></div>
+                        </div>
+                        <div class="goal-progress-text">{{ goal.current_value }}/{{ goal.target_value }}</div>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-bullseye"></i>
+                <h3>No Current Goals</h3>
+                <p>Set some learning goals to stay motivated!</p>
+            </div>
+            {% endif %}
+        </section>
+    </div>
+
+    <!-- Achievements -->
+    <section class="progress-card">
+        <h2 class="section-title"><i class="fas fa-trophy"></i> My Achievements</h2>
+        <div class="achievements-grid">
+            {% for achievement in earned_achievements %}
+            <div class="achievement-card earned">
+                <div class="achievement-icon">
+                    <i class="fas fa-{{ achievement.achievement.icon }}"></i>
+                </div>
+                <h4>{{ achievement.achievement.name }}</h4>
+                <p>{{ achievement.achievement.description }}</p>
+                <small>Earned {{ achievement.earned_date|date:"M d" }}</small>
+            </div>
+            {% endfor %}
+            
+            {% for achievement in unearned_achievements %}
+            <div class="achievement-card">
+                <div class="achievement-icon">
+                    <i class="fas fa-{{ achievement.icon }}"></i>
+                </div>
+                <h4>{{ achievement.name }}</h4>
+                <p>{{ achievement.description }}</p>
+                <small>Locked • {{ achievement.requirement }}</small>
+            </div>
+            {% endfor %}
+            
+            {% if not earned_achievements and not unearned_achievements %}
+            <div class="empty-state">
+                <i class="fas fa-trophy"></i>
+                <h3>No Achievements Yet</h3>
+                <p>Complete assignments to earn achievements!</p>
+            </div>
+            {% endif %}
+        </div>
+    </section>
+</div>
+
+
+<!-- Voice Assistant HTML - Add this before closing body tag -->
+<!-- Voice Assistant HTML -->
+<div class="voice-assistant">
+    <button class="voice-btn" id="voiceBtn" title="Talk to learning assistant">
+        <i class="fas fa-microphone" id="voiceIcon"></i>
+    </button>
+    
+    <div class="voice-panel" id="voicePanel">
+        <div class="voice-header">
+            <div class="voice-avatar">
+                <i class="fas fa-robot"></i>
+            </div>
+            <div>
+                <strong>Learning Assistant</strong>
+                <div style="font-size: 0.8rem; opacity: 0.9;">Always here to help!</div>
+            </div>
+        </div>
+        
+        <div class="voice-messages" id="voiceMessages">
+            <div class="message assistant">
+                Hello! I'm your AI learning assistant. Click the microphone to talk or type your question below. I can help with your progress, subjects, assignments, and more!
+            </div>
+        </div>
+        
+        <div class="listening-indicator" id="listeningIndicator">
+            <div class="recording-dots">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+            Listening... Speak clearly into your microphone
+        </div>
+        
+        <div class="voice-input-area">
+            <div class="voice-input-container">
+                <input type="text" id="voiceInput" placeholder="Type your question or use voice..." class="voice-input">
+                <div class="voice-controls">
+                    <button class="control-btn" id="voiceToggle" title="Start/Stop Voice Recognition">
+                        <i class="fas fa-microphone" id="voiceToggleIcon"></i>
+                    </button>
+                    <button class="control-btn" id="sendText" title="Send Message">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+     class VoiceAssistant {
+        constructor() {
+            this.recognition = null;
+            this.isListening = false;
+            this.isSpeaking = false;
+            this.conversationContext = [];
+            this.speechSynthesis = window.speechSynthesis;
+            
+            this.initializeElements();
+            this.initializeSpeechRecognition();
+            this.setupEventListeners();
+        }
+        
+        initializeElements() {
+            this.elements = {
+                voiceBtn: document.getElementById('voiceBtn'),
+                voicePanel: document.getElementById('voicePanel'),
+                voiceMessages: document.getElementById('voiceMessages'),
+                voiceInput: document.getElementById('voiceInput'),
+                voiceToggle: document.getElementById('voiceToggle'),
+                voiceToggleIcon: document.getElementById('voiceToggleIcon'),
+                sendText: document.getElementById('sendText'),
+                listeningIndicator: document.getElementById('listeningIndicator'),
+                voiceIcon: document.getElementById('voiceIcon')
+            };
+        }
+        
+        initializeSpeechRecognition() {
+            // Check browser support
+            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                this.showMessage('Speech recognition is not supported in your browser. Please use Chrome, Edge, or Safari.', 'assistant');
+                return;
+            }
+            
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            this.recognition = new SpeechRecognition();
+            
+            // Configuration
+            this.recognition.continuous = false;
+            this.recognition.interimResults = false;
+            this.recognition.lang = 'en-US';
+            this.recognition.maxAlternatives = 1;
+            
+            // Event handlers
+            this.recognition.onstart = () => {
+                this.isListening = true;
+                this.updateUI();
+                console.log('Speech recognition started');
+            };
+            
+            this.recognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript;
+                console.log('Speech recognized:', transcript);
+                this.processUserInput(transcript);
+            };
+            
+            this.recognition.onerror = (event) => {
+                console.error('Speech recognition error:', event.error);
+                this.showMessage(`Speech recognition error: ${event.error}`, 'assistant');
+                this.isListening = false;
+                this.updateUI();
+            };
+            
+            this.recognition.onend = () => {
+                console.log('Speech recognition ended');
+                this.isListening = false;
+                this.updateUI();
+            };
+        }
+        
+        setupEventListeners() {
+            // Main voice button
+            this.elements.voiceBtn.addEventListener('click', () => {
+                this.togglePanel();
+            });
+            
+            // Voice toggle button
+            this.elements.voiceToggle.addEventListener('click', () => {
+                this.toggleVoiceRecognition();
+            });
+            
+            // Send text button
+            this.elements.sendText.addEventListener('click', () => {
+                this.sendTextMessage();
+            });
+            
+            // Enter key in text input
+            this.elements.voiceInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    this.sendTextMessage();
+                }
+            });
+            
+            // Click outside to close panel
+            document.addEventListener('click', (e) => {
+                if (!this.elements.voicePanel.contains(e.target) && 
+                    !this.elements.voiceBtn.contains(e.target) &&
+                    this.elements.voicePanel.classList.contains('active')) {
+                    this.hidePanel();
+                }
+            });
+        }
+        
+        togglePanel() {
+            if (this.elements.voicePanel.classList.contains('active')) {
+                this.hidePanel();
+            } else {
+                this.showPanel();
+            }
+        }
+        
+        showPanel() {
+            this.elements.voicePanel.classList.add('active');
+            this.elements.voiceInput.focus();
+        }
+        
+        hidePanel() {
+            this.elements.voicePanel.classList.remove('active');
+            if (this.isListening) {
+                this.stopVoiceRecognition();
+            }
+        }
+        
+        toggleVoiceRecognition() {
+            if (this.isListening) {
+                this.stopVoiceRecognition();
+            } else {
+                this.startVoiceRecognition();
+            }
+        }
+        
+        startVoiceRecognition() {
+            if (!this.recognition) {
+                this.showMessage('Speech recognition not available. Please try typing your message.', 'assistant');
+                return;
+            }
+            
+            try {
+                this.recognition.start();
+                this.elements.listeningIndicator.classList.add('active');
+            } catch (error) {
+                console.error('Error starting recognition:', error);
+                this.showMessage('Error starting voice recognition. Please check your microphone permissions.', 'assistant');
+            }
+        }
+        
+        stopVoiceRecognition() {
+            if (this.recognition && this.isListening) {
+                this.recognition.stop();
+                this.elements.listeningIndicator.classList.remove('active');
+            }
+        }
+        
+        sendTextMessage() {
+            const message = this.elements.voiceInput.value.trim();
+            if (message) {
+                this.processUserInput(message);
+                this.elements.voiceInput.value = '';
+            }
+        }
+        
+        async processUserInput(message) {
+            // Show user message
+            this.showMessage(message, 'user');
+            
+            // Show typing indicator
+            const typingIndicator = this.showMessage('Thinking...', 'assistant', true);
+            
+            try {
+                const response = await this.sendToAssistant(message);
+                
+                // Remove typing indicator
+                typingIndicator.remove();
+                
+                if (response.success) {
+                    this.showMessage(response.response, 'assistant');
+                    this.speakResponse(response.response);
+                    this.conversationContext = response.context || this.conversationContext;
+                } else {
+                    this.showMessage(`Error: ${response.error}`, 'assistant');
+                }
+            } catch (error) {
+                console.error('Error processing message:', error);
+                typingIndicator.remove();
+                this.showMessage('Sorry, I encountered an error. Please try again.', 'assistant');
+            }
+        }
+        
+        async sendToAssistant(message) {
+            const response = await fetch('{% url "voice_assistant_api" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({
+                    message: message,
+                    context: this.conversationContext
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            return await response.json();
+        }
+        
+        speakResponse(text) {
+            if (!this.speechSynthesis) {
+                console.log('Speech synthesis not supported');
+                return;
+            }
+            
+            // Stop any ongoing speech
+            this.speechSynthesis.cancel();
+            
+            const utterance = new SpeechSynthesisUtterance(text);
+            
+            // Configuration
+            utterance.rate = 0.9;
+            utterance.pitch = 1.0;
+            utterance.volume = 0.8;
+            utterance.lang = 'en-US';
+            
+            utterance.onstart = () => {
+                this.isSpeaking = true;
+                this.updateUI();
+            };
+            
+            utterance.onend = () => {
+                this.isSpeaking = false;
+                this.updateUI();
+            };
+            
+            utterance.onerror = (event) => {
+                console.error('Speech synthesis error:', event);
+                this.isSpeaking = false;
+                this.updateUI();
+            };
+            
+            this.speechSynthesis.speak(utterance);
+        }
+        
+        showMessage(text, sender, isTyping = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender} ${isTyping ? 'typing' : ''}`;
+            
+            if (isTyping) {
+                messageDiv.innerHTML = `<em>${text}</em>`;
+            } else {
+                const timestamp = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                messageDiv.innerHTML = `
+                    <div>${text}</div>
+                    <div style="font-size: 0.7rem; opacity: 0.7; margin-top: 0.3rem;">${timestamp}</div>
+                `;
+            }
+            
+            this.elements.voiceMessages.appendChild(messageDiv);
+            this.elements.voiceMessages.scrollTop = this.elements.voiceMessages.scrollHeight;
+            
+            return messageDiv;
+        }
+        
+        updateUI() {
+            // Update voice button
+            this.elements.voiceBtn.classList.remove('listening', 'speaking');
+            this.elements.voiceToggle.classList.remove('active');
+            
+            if (this.isListening) {
+                this.elements.voiceBtn.classList.add('listening');
+                this.elements.voiceToggle.classList.add('active');
+                this.elements.voiceIcon.className = 'fas fa-circle';
+                this.elements.voiceToggleIcon.className = 'fas fa-stop';
+            } else if (this.isSpeaking) {
+                this.elements.voiceBtn.classList.add('speaking');
+                this.elements.voiceIcon.className = 'fas fa-volume-up';
+                this.elements.voiceToggleIcon.className = 'fas fa-microphone';
+            } else {
+                this.elements.voiceIcon.className = 'fas fa-microphone';
+                this.elements.voiceToggleIcon.className = 'fas fa-microphone';
+            }
+        }
+    }
+    
+    // Initialize the voice assistant when the page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        window.voiceAssistant = new VoiceAssistant();
+        
+        // Animate progress bars
+        const progressBars = document.querySelectorAll('.progress-fill');
+        progressBars.forEach(bar => {
+            const width = bar.style.width;
+            bar.style.width = '0%';
+            setTimeout(() => {
+                bar.style.width = width;
+            }, 500);
+        });
+    });
+    // Goal completion toggle
+    function toggleGoal(goalId) {
+        const checkbox = event.target.closest('.goal-checkbox');
+        const completed = !checkbox.classList.contains('checked');
+        
+        fetch(`/goals/${goalId}/update/`, {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({
+                completed: completed
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                if (data.completed) {
+                    checkbox.classList.add('checked');
+                    checkbox.innerHTML = '<i class="fas fa-check"></i>';
+                    
+                    // Update progress bar
+                    const progressFill = checkbox.closest('.goal-item').querySelector('.goal-progress-fill');
+                    progressFill.style.width = '100%';
+                    
+                    // Show celebration
+                    showCelebration('Goal completed! Great job!');
+                } else {
+                    checkbox.classList.remove('checked');
+                    checkbox.innerHTML = '';
+                }
+            }
+        });
+    }
+    
+    function showCelebration(message) {
+    // Simple celebration effect
+        const celebration = document.createElement('div');
+        celebration.style.position = 'fixed';
+        celebration.style.top = '50%';
+        celebration.style.left = '50%';
+        celebration.style.transform = 'translate(-50%, -50%)';
+        celebration.style.background = 'linear-gradient(135deg, var(--success), #22c55e)';
+        celebration.style.color = 'white';
+        celebration.style.padding = '2rem 3rem';
+        celebration.style.borderRadius = '20px';
+        celebration.style.boxShadow = '0 20px 40px rgba(0,0,0,0.3)';
+        celebration.style.zIndex = '10000';
+        celebration.style.textAlign = 'center';
+        celebration.style.fontSize = '1.5rem';
+        celebration.style.fontWeight = '600';
+        celebration.innerHTML = `
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 1rem;">
+                <i class="fas fa-trophy" style="font-size: 3rem;"></i>
+                <div>${message}</div>
+            </div>
+        `;
+        
+        document.body.appendChild(celebration);
+        
+        // Add confetti effect
+        createConfetti();
+        
+        // Remove celebration after 3 seconds
+        setTimeout(() => {
+            celebration.style.opacity = '0';
+            celebration.style.transition = 'opacity 0.5s ease';
+            setTimeout(() => celebration.remove(), 500);
+        }, 3000);
+    }
+
+    function createConfetti() {
+        const confettiCount = 100;
+        const colors = ['#FF6B6B', '#4ECDC4', '#FFD166', '#06D6A0', '#118AB2', '#A663CC'];
+        
+        for (let i = 0; i < confettiCount; i++) {
+            const confetti = document.createElement('div');
+            confetti.style.position = 'fixed';
+            confetti.style.width = '10px';
+            confetti.style.height = '10px';
+            confetti.style.background = colors[Math.floor(Math.random() * colors.length)];
+            confetti.style.borderRadius = '50%';
+            confetti.style.top = '0';
+            confetti.style.left = Math.random() * 100 + 'vw';
+            confetti.style.zIndex = '9999';
+            confetti.style.pointerEvents = 'none';
+            
+            document.body.appendChild(confetti);
+            
+            // Animate confetti falling
+            const animation = confetti.animate([
+                { transform: 'translateY(0) rotate(0deg)', opacity: 1 },
+                { transform: `translateY(100vh) rotate(${Math.random() * 360}deg)`, opacity: 0 }
+            ], {
+                duration: Math.random() * 3000 + 2000,
+                easing: 'cubic-bezier(0.1, 0.8, 0.1, 1)'
+            });
+            
+            animation.onfinish = () => confetti.remove();
+        }
+    }
+
+    function viewSubjectDetails(subjectName) {
+        // Navigate to subject detail page or show modal
+        window.location.href = `/subjects/${subjectName.toLowerCase()}/progress/`;
+    }
+
+    // Real-time progress updates
+function startProgressUpdates() {
+    // Update progress every 30 seconds (for demo purposes)
+    setInterval(() => {
+        updateLiveProgress();
+    }, 30000);
+}
+
+function updateLiveProgress() {
+    fetch('/api/progress-update/', {
+        method: 'GET',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRFToken': '{{ csrf_token }}'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Update progress circle
+            const progressFill = document.querySelector('.progress-fill');
+            const progressValue = document.querySelector('.progress-value');
+            
+            if (progressFill && progressValue) {
+                progressFill.style.background = `conic-gradient(var(--primary) 0% ${data.progress}%, var(--light-gray) ${data.progress}% 100%)`;
+                progressValue.textContent = `${data.progress}%`;
+            }
+            
+            // Update stats
+            updateStats(data.stats);
+        }
+    })
+    .catch(error => console.error('Progress update error:', error));
+}
+
+function updateStats(stats) {
+    // Update various stat elements
+    const statElements = {
+        'completed-assignments': stats.completed_assignments,
+        'average-score': stats.avg_score,
+        'learning-time': stats.total_time_hours
+    };
+    
+    for (const [key, value] of Object.entries(statElements)) {
+        const element = document.querySelector(`[data-stat="${key}"]`);
+        if (element) {
+            animateValue(element, parseInt(element.textContent) || 0, value, 1000);
+        }
+    }
+}
+
+function animateValue(element, start, end, duration) {
+    let startTimestamp = null;
+    const step = (timestamp) => {
+        if (!startTimestamp) startTimestamp = timestamp;
+        const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+        element.textContent = Math.floor(progress * (end - start) + start);
+        if (progress < 1) {
+            window.requestAnimationFrame(step);
+        }
+    };
+    window.requestAnimationFrame(step);
+}
+
+// Initialize when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    startProgressUpdates();
+    
+    // Add smooth animations for progress bars
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const progressBar = entry.target.querySelector('.subject-progress-bar');
+                if (progressBar) {
+                    const width = progressBar.style.width;
+                    progressBar.style.width = '0%';
+                    setTimeout(() => {
+                        progressBar.style.width = width;
+                    }, 100);
+                }
+            }
+        });
+    });
+    
+    document.querySelectorAll('.subject-card').forEach(card => {
+        observer.observe(card);
+    });
+});
+</script>
+{% endblock %}

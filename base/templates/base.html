@@ -3,101 +3,118 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}ShuleVoice | Student Management Dashboard{% endblock %}</title>
+    <title>{% block title %}EduTrack Pro | Student Management Dashboard{% endblock %}</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     {% load static %}
     <link rel="stylesheet" href="{% static 'css/styles.css' %}">
     {% block extra_css %}{% endblock %}
 </head>
 <body>
-    <!-- Sidebar Navigation -->
-    <div class="sidebar">
-        <div class="sidebar-header">
-            <i class="fas fa-graduation-cap"></i>
-            <h2>ShuleVoice</h2>
-        </div>
-        
-        <div class="sidebar-menu">
-            <div class="menu-label">Main</div>
-            <a href="{% url 'dashboard' %}" class="menu-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
-                <i class="fas fa-home"></i>
-                <span>Dashboard</span>
-            </a>
-            <a href="{% url 'students' %}" class="menu-item {% if request.resolver_match.url_name == 'students' %}active{% endif %}">
-                <i class="fas fa-user-graduate"></i>
-                <span>Students</span>
-            </a>
-            <a href="{% url 'analytics' %}" class="menu-item {% if request.resolver_match.url_name == 'analytics' %}active{% endif %}">
-                <i class="fas fa-chart-bar"></i>
-                <span>Analytics</span>
-            </a>
-            <a href="{% url 'assignments' %}" class="menu-item {% if request.resolver_match.url_name == 'assignments' %}active{% endif %}">
-                <i class="fas fa-tasks"></i>
-                <span>Assignments</span>
-            </a>
-            
-            <div class="menu-label">Management</div>
-            <a href="{% url 'schedule' %}" class="menu-item {% if request.resolver_match.url_name == 'schedule' %}active{% endif %}">
-                <i class="fas fa-calendar-alt"></i>
-                <span>Schedule</span>
-            </a>
-            <a href="{% url 'reports' %}" class="menu-item {% if request.resolver_match.url_name == 'reports' %}active{% endif %}">
-                <i class="fas fa-file-alt"></i>
-                <span>Reports</span>
-            </a>
-            <a href="{% url 'announcements' %}" class="menu-item {% if request.resolver_match.url_name == 'announcements' %}active{% endif %}">
-                <i class="fas fa-bullhorn"></i>
-                <span>Announcements</span>
-            </a>
-            
-            <div class="menu-label">Settings</div>
-            <a href="{% url 'settings' %}" class="menu-item {% if request.resolver_match.url_name == 'settings' %}active{% endif %}">
-                <i class="fas fa-cog"></i>
-                <span>Settings</span>
-            </a>
-            <a href="{% url 'help' %}" class="menu-item {% if request.resolver_match.url_name == 'help' %}active{% endif %}">
-                <i class="fas fa-question-circle"></i>
-                <span>Help & Support</span>
-            </a>
-        </div>
-    </div>
-
-    <!-- Main Content Area -->
-    <div class="main-content">
-        <!-- Header -->
-        <div class="header">
-            <div class="header-left">
-                <h1>{% block page_title %}Student Progress Dashboard{% endblock %}</h1>
-            </div>
-            <div class="header-right">
-                <div class="search-box">
-                    <i class="fas fa-search"></i>
-                    <input type="text" placeholder="Search students, assignments..." id="globalSearch">
+    {% if user.is_authenticated %}
+        <!-- Check if user is a student -->
+        {% if user.student_profile and user.student_profile.can_login %}
+            <!-- Student Layout -->
+            {% include 'student_base.html' %}
+        {% else %}
+            <!-- Educator Layout -->
+            <div class="sidebar">
+                <div class="sidebar-header">
+                    <i class="fas fa-graduation-cap"></i>
+                    <h2>Shule Voice</h2>
                 </div>
-                <div class="user-actions">
-                    <div class="notification">
-                        <i class="fas fa-bell"></i>
-                        <div class="notification-badge">{{ unread_notifications_count }}</div>
+                
+                <div class="sidebar-menu">
+                    <div class="menu-label">Main</div>
+                    <a href="{% url 'dashboard' %}" class="menu-item {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+                        <i class="fas fa-home"></i>
+                        <span>Dashboard</span>
+                    </a>
+                    <a href="{% url 'students' %}" class="menu-item {% if request.resolver_match.url_name == 'students' %}active{% endif %}">
+                        <i class="fas fa-user-graduate"></i>
+                        <span>Students</span>
+                    </a>
+                    <a href="{% url 'analytics' %}" class="menu-item {% if request.resolver_match.url_name == 'analytics' %}active{% endif %}">
+                        <i class="fas fa-chart-bar"></i>
+                        <span>Analytics</span>
+                    </a>
+                    <a href="{% url 'assignments' %}" class="menu-item {% if request.resolver_match.url_name == 'assignments' %}active{% endif %}">
+                        <i class="fas fa-tasks"></i>
+                        <span>Assignments</span>
+                    </a>
+                    
+                    <div class="menu-label">Management</div>
+                    <a href="{% url '#' %}" class="menu-item {% if request.resolver_match.url_name == '#' %}active{% endif %}">
+                        <i class="fas fa-calendar-alt"></i>
+                        <span>Student Progress</span>
+                    </a>
+                    <a href="{% url '#' %}" class="menu-item {% if request.resolver_match.url_name == 'reports' %}active{% endif %}">
+                        <i class="fas fa-file-alt"></i>
+                        <span>Reports</span>
+                    </a>
+                    <a href="{% url '#' %}" class="menu-item {% if request.resolver_match.url_name == '#' %}active{% endif %}">
+                        <i class="fas fa-bullhorn"></i>
+                        <span>Announcements</span>
+                    </a>
+                    
+                    <div class="menu-label">Settings</div>
+                    <a href="{% url 'admin:index' %}" class="menu-item {% if request.resolver_match.url_name == 'settings' %}active{% endif %}">
+                        <i class="fas fa-cog"></i>
+                        <span>Settings</span>
+                    </a>
+                    <a href="{% url '#' %}" class="menu-item {% if request.resolver_match.url_name == 'help' %}active{% endif %}">
+                        <i class="fas fa-question-circle"></i>
+                        <span>Help & Support</span>
+                    </a>
+                    <a href="{% url 'logout' %}" class="menu-item">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span>Logout</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Main Content Area for Educators -->
+            <div class="main-content">
+                <!-- Header -->
+                <div class="header">
+                    <div class="header-left">
+                        <h1>{% block page_title %}Student Progress Dashboard{% endblock %}</h1>
                     </div>
-                    <div class="user-profile">
-                        <div class="avatar">{{ user.first_name|first }}{{ user.last_name|first }}</div>
-                        <div>
-                            <div>{% if user.get_full_name %}{{ user.get_full_name }}{% else %}{{ user.username }}{% endif %}</div>
-                            <div style="font-size: 0.8rem; color: var(--gray);">
-                                {% if user.is_superuser %}Administrator{% else %}Educator{% endif %}
+                    <div class="header-right">
+                        <div class="search-box">
+                            <i class="fas fa-search"></i>
+                            <input type="text" placeholder="Search students, assignments..." id="globalSearch">
+                        </div>
+                        <div class="user-actions">
+                            <div class="notification">
+                                <i class="fas fa-bell"></i>
+                                <div class="notification-badge">{{ unread_notifications_count|default:0 }}</div>
+                            </div>
+                            <div class="user-profile">
+                                <div class="avatar">{{ user.first_name|first }}{{ user.last_name|first }}</div>
+                                <div>
+                                    <div>{% if user.get_full_name %}{{ user.get_full_name }}{% else %}{{ user.username }}{% endif %}</div>
+                                    <div style="font-size: 0.8rem; color: var(--gray);">
+                                        {% if user.is_superuser %}Administrator{% else %}Educator{% endif %}
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
 
-        <!-- Main Content -->
-        <div class="dashboard">
-            {% block content %}
-            {% endblock %}
+                <!-- Main Content -->
+                <div class="dashboard">
+                    {% block content %}
+                    {% endblock %}
+                </div>
+            </div>
+        {% endif %}
+    {% else %}
+        <!-- Public/Layout for non-authenticated users -->
+        <div class="public-container">
+            {% block public_content %}{% endblock %}
         </div>
-    </div>
+    {% endif %}
 
     {% block extra_js %}{% endblock %}
     
@@ -139,7 +156,9 @@
                     if (e.key === 'Enter') {
                         const query = this.value.trim();
                         if (query) {
-                            window.location.href = `{% url 'search' %}?q=${encodeURIComponent(query)}`;
+                            // You need to create a search view first
+                            // window.location.href = `{% url 'search' %}?q=${encodeURIComponent(query)}`;
+                            alert('Search functionality will be implemented soon!');
                         }
                     }
                 });

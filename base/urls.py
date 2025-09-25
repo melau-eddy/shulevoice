@@ -23,6 +23,10 @@ urlpatterns = [
     path('assignments/<int:pk>/', views.assignment_detail, name='assignment_detail'),
     path('assignments/<int:pk>/update-progress/', views.update_assignment_progress, name='update_assignment_progress'),
 
+    path('progress/', views.student_progress_view, name='student_progress'),
+    path('progress/<int:student_id>/', views.student_progress_view, name='student_progress_detail'),
+    path('api/voice-assistant/', views.voice_assistant_api, name='voice_assistant_api'),
+    path('goals/<int:goal_id>/update/', views.update_goal_progress, name='update_goal_progress'),
 
     path('schedule/', views.schedule_view, name='schedule'),
     path('reports/', views.reports_view, name='reports'),
@@ -36,4 +40,10 @@ urlpatterns = [
     path('logout/', views.custom_logout, name='logout'),
     path('signup/', views.custom_signup, name='signup'),
     path('password-reset/', views.password_reset_request, name='password_reset'),
+
+    path('student/<int:student_id>/blockchain/', views.real_blockchain_verification, name='blockchain_verification'),
+    # path('student/<int:student_id>/blockchain-timeline/', views.student_blockchain_timeline, name='blockchain_timeline'),
+    # path('api/student/<int:student_id>/blockchain-data/', views.api_blockchain_data, name='api_blockchain_data'),
+    # path('api/student/<int:student_id>/verify-integrity/', views.api_verify_data_integrity, name='api_verify_integrity'),
+    # path('api/blockchain/nodes/', views.api_blockchain_add_node, name='api_blockchain_add_node'),
 ]

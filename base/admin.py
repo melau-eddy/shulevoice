@@ -48,3 +48,18 @@ class StudentNoteAdmin(admin.ModelAdmin):
     list_display = ['student', 'author', 'created_at', 'is_important']
     list_filter = ['is_important', 'created_at', 'author']
     search_fields = ['student__name', 'note']
+
+# admin.py
+from django.contrib import admin
+from .models import BlockchainRecord
+
+@admin.register(BlockchainRecord)
+class BlockchainRecordAdmin(admin.ModelAdmin):
+    list_display = ['student', 'transaction_type', 'transaction_hash_short', 'timestamp']
+    list_filter = ['transaction_type', 'timestamp']
+    search_fields = ['student__name', 'transaction_hash']
+    
+    
+    def transaction_hash_short(self, obj):
+        return obj.transaction_hash[:16] + '...' if obj.transaction_hash else ''
+    transaction_hash_short.short_description = 'Transaction Hash'
