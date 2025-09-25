@@ -43,28 +43,16 @@
                     </a>
                     
                     <div class="menu-label">Management</div>
-                    <a href="{% url '#' %}" class="menu-item {% if request.resolver_match.url_name == '#' %}active{% endif %}">
+                    <a href="{% url 'student_progress' %}" class="menu-item {% if request.resolver_match.url_name == 'student_progress' %}active{% endif %}">
                         <i class="fas fa-calendar-alt"></i>
                         <span>Student Progress</span>
                     </a>
-                    <a href="{% url '#' %}" class="menu-item {% if request.resolver_match.url_name == 'reports' %}active{% endif %}">
-                        <i class="fas fa-file-alt"></i>
-                        <span>Reports</span>
-                    </a>
-                    <a href="{% url '#' %}" class="menu-item {% if request.resolver_match.url_name == '#' %}active{% endif %}">
-                        <i class="fas fa-bullhorn"></i>
-                        <span>Announcements</span>
-                    </a>
-                    
                     <div class="menu-label">Settings</div>
                     <a href="{% url 'admin:index' %}" class="menu-item {% if request.resolver_match.url_name == 'settings' %}active{% endif %}">
                         <i class="fas fa-cog"></i>
                         <span>Settings</span>
                     </a>
-                    <a href="{% url '#' %}" class="menu-item {% if request.resolver_match.url_name == 'help' %}active{% endif %}">
-                        <i class="fas fa-question-circle"></i>
-                        <span>Help & Support</span>
-                    </a>
+                    
                     <a href="{% url 'logout' %}" class="menu-item">
                         <i class="fas fa-sign-out-alt"></i>
                         <span>Logout</span>

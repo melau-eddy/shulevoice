@@ -660,6 +660,32 @@
             </div>
         </div>
     </div>
+    <!-- Add this to your template after the Achievements section -->
+    <div class="progress-section">
+        <h2 class="section-title"><i class="fas fa-comments"></i> Recent Conversations</h2>
+        <div>
+            {% for interaction in voice_interactions %}
+            <div class="activity-item">
+                <div class="activity-icon" style="background: #4361ee20; color: #4361ee;">
+                    <i class="fas fa-microphone"></i>
+                </div>
+                <div>
+                    <strong>Voice Interaction</strong>
+                    <p style="color: var(--gray); margin: 0; font-size: 0.9rem;">
+                        <strong>You:</strong> {{ interaction.voice_command|truncatewords:10 }}<br>
+                        <strong>Assistant:</strong> {{ interaction.system_response|truncatewords:10 }}
+                    </p>
+                    <small style="color: var(--gray);">{{ interaction.timestamp|timesince }} ago</small>
+                </div>
+            </div>
+            {% empty %}
+            <div style="text-align: center; padding: 2rem; color: var(--gray);">
+                <i class="fas fa-comments" style="font-size: 3rem; margin-bottom: 1rem;"></i>
+                <p>No conversations yet. Start talking with the voice assistant!</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
 
     <!-- Voice Assistant -->
     <div class="voice-assistant">

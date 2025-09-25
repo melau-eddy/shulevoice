@@ -38,7 +38,8 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
-
+# Add to your settings.py
+GROQ_API_KEY = "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"  # Get free API key from https://console.groq.com
 # Application definition
 
 INSTALLED_APPS = [

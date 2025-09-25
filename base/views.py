@@ -672,7 +672,6 @@ def analytics_view(request):
         ).count()
         
         # For clarification needed and no response, we'll use confidence score as proxy
-        # since we don't have those specific fields in VoiceInteraction
         clarification_needed = VoiceInteraction.objects.filter(
             student__created_by=request.user,
             timestamp__gte=start_date,
@@ -687,7 +686,12 @@ def analytics_view(request):
             success=False
         ).count()
         
-        no_response = 0  # We don't have this data, so set to 0
+        no_response = VoiceInteraction.objects.filter(
+            student__created_by=request.user,
+            timestamp__gte=start_date,
+            success=True,
+            confidence_score__lt=0.4
+        ).count()
         
         # Calculate percentages for voice analysis
         understood_pct = round((understood / total_voice * 100), 1) if total_voice > 0 else 0
@@ -728,6 +732,15 @@ def analytics_view(request):
         ).annotate(
             attempts=Count('id')
         ).order_by('-attempts')[:10]
+        
+        # Fix the top_topics data structure for the template
+        formatted_top_topics = []
+        for topic in top_topics:
+            formatted_top_topics.append({
+                'topic__name': topic['assignment__title'] or 'General Progress',
+                'topic__subject__name': topic['subject__name'] or 'General',
+                'attempts': topic['attempts']
+            })
         
         # REAL DATA: Accuracy by subject
         subject_accuracy = []
@@ -797,13 +810,29 @@ def analytics_view(request):
         )
         formatted_students = formatted_students[:10]
         
+        # Prepare data for charts
+        chart_labels = [f"Week {i+1}" for i in range(4)]
+        chart_datasets = []
+        
+        # Create dataset for each subject
+        for subject in subjects[:3]:  # Limit to first 3 subjects for clarity
+            subject_data = []
+            for week_data in weekly_data:
+                subject_data.append(week_data.get(subject.name, 0))
+            
+            chart_datasets.append({
+                'label': subject.name,
+                'data': subject_data,
+                'backgroundColor': get_subject_color(subject.name)
+            })
+        
         context = {
             'total_learning_hours': total_learning_hours,
             'topics_attempted': topics_attempted,
             'voice_responses': voice_responses,
             'average_accuracy': avg_accuracy,
             'weekly_data': weekly_data,
-            'top_topics': list(top_topics),
+            'top_topics': formatted_top_topics,
             'subject_accuracy': subject_accuracy,
             'student_activity': formatted_students,
             'voice_analysis': {
@@ -815,12 +844,15 @@ def analytics_view(request):
             'date_preset': date_preset,
             'start_date': start_date.strftime('%Y-%m-%d'),
             'end_date': end_date.strftime('%Y-%m-%d'),
+            'chart_labels': chart_labels,
+            'chart_datasets': chart_datasets,
         }
         
         # Debug output
         print(f"DEBUG Analytics: Total hours: {total_learning_hours}")
         print(f"DEBUG Analytics: Topics attempted: {topics_attempted}")
         print(f"DEBUG Analytics: Student activity count: {len(formatted_students)}")
+        print(f"DEBUG Analytics: Top topics count: {len(formatted_top_topics)}")
         
         return render(request, 'analytics.html', context)
         
@@ -848,8 +880,25 @@ def analytics_view(request):
             'date_preset': 'last_30_days',
             'start_date': (timezone.now() - timedelta(days=30)).strftime('%Y-%m-%d'),
             'end_date': timezone.now().strftime('%Y-%m-%d'),
+            'chart_labels': [],
+            'chart_datasets': [],
         }
         return render(request, 'analytics.html', context)
+
+def get_subject_color(subject_name):
+    """Get color for subject"""
+    color_map = {
+        'Mathematics': '#4361ee',
+        'Science': '#4cc9f0', 
+        'Reading': '#FFD166',
+        'Writing': '#06D6A0',
+        'Language Arts': '#118AB2',
+        'Arts': '#A663CC',
+        'Social Studies': '#FF9E64',
+        'Math': '#4361ee',  # Alias for Mathematics
+        'English': '#118AB2',  # Alias for Language Arts
+    }
+    return color_map.get(subject_name, '#4361ee')
 
 # Add to your views.py
 
@@ -1498,46 +1547,60 @@ def student_progress_view(request, student_id=None):
         # Get learning streak
         streak, created = LearningStreak.objects.get_or_create(student=student)
         
-        # Calculate weekly progress
-        one_week_ago = timezone.now() - timedelta(days=7)
-        weekly_progress = StudentProgress.objects.filter(
-            student=student,
-            last_updated__gte=one_week_ago
-        ).aggregate(
-            completed=Count('id', filter=Q(completed=True)),
-            total_time=Sum('time_spent')
-        )
+        # Get voice interactions for this student (for conversation recording)
+        voice_interactions = VoiceInteraction.objects.filter(
+            student=student
+        ).order_by('-timestamp')[:10]  # Last 10 conversations
         
-        # Get class rank (simplified)
-        total_students = Student.objects.filter(
-            created_by=student.created_by,
-            is_active=True
-        ).count()
+        # Get pending assignments
+        pending_assignments = Assignment.objects.filter(
+            assignmentstudent__student=student,
+            assignmentstudent__completed=False,
+            status='active',
+            due_date__gte=timezone.now()
+        ).distinct()[:5]
         
-        # Simplified rank calculation
-        student_rank = 1
+        # Get overdue assignments
+        overdue_assignments = Assignment.objects.filter(
+            assignmentstudent__student=student,
+            assignmentstudent__completed=False,
+            status='active',
+            due_date__lt=timezone.now()
+        ).distinct()[:5]
         
         context = {
-            'student': student,
-            'is_own_profile': is_own_profile,
-            'is_student_user': is_student_user,
+            # Main progress data (matching template variables)
             'overall_progress': round(overall_progress, 1),
-            'total_assignments': total_assignments,
             'completed_assignments': completed_assignments,
+            'total_assignments': total_assignments,
             'avg_score': round(avg_score, 1),
-            'total_time_hours': round(total_time_minutes / 60, 1),
+            'learning_streak': streak.current_streak,
+            
+            # Subjects progress (matching template structure)
             'subjects_progress': subjects_progress,
+            
+            # Recent activities (matching template structure)
             'recent_activities': formatted_activities,
+            
+            # Goals and achievements
             'current_goals': current_goals,
             'earned_achievements': earned_achievements,
             'unearned_achievements': unearned_achievements,
-            'learning_streak': streak.current_streak,
+            
+            # Additional data for the template
+            'student': student,
+            'is_own_profile': is_own_profile,
+            'is_student_user': is_student_user,
+            'total_time_hours': round(total_time_minutes / 60, 1),
             'longest_streak': streak.longest_streak,
-            'weekly_completed': weekly_progress['completed'] or 0,
-            'weekly_time': round((weekly_progress['total_time'] or 0) / 60, 1),
-            'class_rank': student_rank,
-            'total_classmates': total_students - 1,
             'motivational_message': get_motivational_message(overall_progress, streak.current_streak),
+            
+            # Voice interactions (for conversation display)
+            'voice_interactions': voice_interactions,
+            
+            # Assignment data
+            'pending_assignments': pending_assignments,
+            'overdue_assignments': overdue_assignments,
         }
         
         return render(request, template_name, context)
@@ -1551,14 +1614,27 @@ def get_subject_color(subject_name):
     """Get color for subject"""
     color_map = {
         'Mathematics': '#FF6B6B',
-        'Science': '#4ECDC4',
+        'Science': '#4ECDC4', 
         'Reading': '#FFD166',
         'Writing': '#06D6A0',
         'Language Arts': '#118AB2',
         'Arts': '#A663CC',
         'Social Studies': '#FF9E64',
+        'Math': '#FF6B6B',  # Alias for Mathematics
+        'English': '#118AB2',  # Alias for Language Arts
     }
     return color_map.get(subject_name, '#4361ee')
+
+def get_motivational_message(progress, streak):
+    """Generate motivational message based on progress and streak"""
+    if progress >= 90:
+        return "Outstanding work! You're mastering your subjects! 🌟"
+    elif progress >= 75:
+        return "Great progress! You're doing amazing! 💪"
+    elif progress >= 50:
+        return "Good work! Keep going, you're getting there! 🚀"
+    else:
+        return "Every journey starts with a first step. Keep learning! 📚"
 
 def get_subject_icon(subject_name):
     """Get icon for subject"""
@@ -1573,46 +1649,30 @@ def get_subject_icon(subject_name):
     }
     return icon_map.get(subject_name, 'book')
 
-def get_motivational_message(progress, streak):
-    """Generate motivational message based on progress and streak"""
-    messages = []
-    
-    if progress >= 90:
-        messages.append("Outstanding work! You're mastering your subjects!")
-    elif progress >= 75:
-        messages.append("Great progress! You're doing amazing!")
-    elif progress >= 50:
-        messages.append("Good work! Keep going, you're getting there!")
-    else:
-        messages.append("Every journey starts with a first step. Keep learning!")
-    
-    if streak >= 7:
-        messages.append(f"Amazing {streak}-day streak! Your consistency is impressive!")
-    elif streak >= 3:
-        messages.append(f"Nice {streak}-day streak! Keep the momentum going!")
-    
-    return " ".join(messages) if messages else "Keep up the great work!"
 
 # views.py - Replace the voice_assistant_api function
 # views.py - Replace the voice_assistant_api function
 import json
 import random
+import groq
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
+from django.conf import settings
+import requests
 
 @login_required
 @csrf_exempt
 def voice_assistant_api(request):
-    """Enhanced voice assistant with real conversation capabilities"""
-    print(f"Voice Assistant API called - Method: {request.method}")  # Debug
-    
+    """Enhanced voice assistant with Groq AI integration"""
+    print(f"Voice Assistant API called - Method: {request.method}")
+
     if request.method == 'POST':
         try:
             # Debug: Print raw request body
             body = request.body.decode('utf-8')
-            print(f"Raw request body: {body}")  # Debug
-            
+            print(f"Raw request body: {body}")
+
             # Handle empty body
             if not body.strip():
                 return JsonResponse({
@@ -1620,106 +1680,405 @@ def voice_assistant_api(request):
                     'error': 'Empty request body',
                     'response': "I didn't receive any message. Please try again."
                 })
-            
+
             try:
                 data = json.loads(body)
             except json.JSONDecodeError as e:
-                print(f"JSON decode error: {e}")  # Debug
+                print(f"JSON decode error: {e}")
                 return JsonResponse({
                     'success': False, 
                     'error': 'Invalid JSON format',
                     'response': "There was an issue with your request. Please try again."
                 })
-            
+
             user_message = data.get('message', '').strip()
             conversation_context = data.get('context', [])
-            
-            print(f"Voice Assistant - User message: '{user_message}'")  # Debug
-            
+
+            print(f"Voice Assistant - User message: '{user_message}'")
+
             # Safe student access
             student = None
             try:
-                if hasattr(request.user, 'student_profile') and request.user.student_profile:
-                    student = request.user.student_profile
-                    print(f"Found student profile: {student.name}")  # Debug
-                else:
-                    student = Student.objects.filter(created_by=request.user).first()
-                    if student:
-                        print(f"Using fallback student: {student.name}")  # Debug
+                student = Student.objects.filter(created_by=request.user).first()
+                if student:
+                    print(f"Using student: {student.name}")
             except Exception as e:
-                print(f"Error accessing student: {e}")  # Debug
-                return JsonResponse({
-                    'success': False, 
-                    'error': 'Student access error',
-                    'response': "I couldn't access your student profile. Please contact your teacher."
-                })
-            
-            if not student:
-                return JsonResponse({
-                    'success': False, 
-                    'error': 'No student data found',
-                    'response': "I couldn't find your student profile. Please contact your teacher."
-                })
-            
-            # Get comprehensive student data for context
-            student_data = get_student_context_data(student)
-            print(f"Student data retrieved successfully")  # Debug
-            
-            # Generate intelligent response
-            response_text = generate_intelligent_response(
+                print(f"Error accessing student: {e}")
+
+            # Get student context data for AI
+            student_context = get_student_context_data(student) if student else {}
+
+            # Generate intelligent response using Groq AI
+            response_text = generate_groq_response(
                 user_message, 
-                student, 
-                student_data,
+                student_context,
                 conversation_context
             )
-            print(f"Generated response: {response_text[:100]}...")  # Debug
-            
-            # Update learning streak for activity
-            update_student_activity(student)
-            
-            # Log the interaction
-            try:
-                VoiceInteraction.objects.create(
-                    student=student,
-                    voice_command=user_message[:500],  # Limit length
-                    system_response=response_text[:500],
-                    success=True,
-                    confidence_score=0.9
-                )
-                print("Voice interaction logged successfully")  # Debug
-            except Exception as e:
-                print(f"Error logging interaction: {e}")  # Debug
-            
+            print(f"Generated response: {response_text[:100]}...")
+
+            # Update learning streak for activity if student exists
+            if student:
+                update_student_activity(student)
+
+                # Log the interaction
+                try:
+                    VoiceInteraction.objects.create(
+                        student=student,
+                        voice_command=user_message[:500],
+                        system_response=response_text[:500],
+                        success=True,
+                        confidence_score=0.9
+                    )
+                    print("Voice interaction logged successfully")
+                except Exception as e:
+                    print(f"Error logging interaction: {e}")
+
             response_data = {
                 'success': True,
                 'response': response_text,
                 'context': conversation_context[-5:] + [{'user': user_message, 'assistant': response_text}]
             }
-            
-            print(f"Returning response: {json.dumps(response_data)[:200]}...")  # Debug
+
+            print(f"Returning response: {json.dumps(response_data)[:200]}...")
             return JsonResponse(response_data)
-            
+
         except Exception as e:
             print(f"Voice assistant error: {e}")
             import traceback
             traceback.print_exc()
-            
+
             return JsonResponse({
                 'success': False,
                 'error': str(e),
                 'response': "I encountered an unexpected error. Please try again in a moment."
             })
-    
-    # Handle GET requests or other methods
+
     return JsonResponse({
         'success': False, 
         'error': 'Invalid request method', 
         'response': 'Please use POST method for voice assistant requests.'
     })
 
-def get_student_context_data(student):
-    """Get comprehensive student data for context-aware responses"""
+def get_groq_client():
+    """Initialize Groq client with API key"""
     try:
+        # Add your Groq API key in settings.py
+        api_key = getattr(settings, 'GROQ_API_KEY', 'your-groq-api-key-here')
+        if api_key == 'your-groq-api-key-here':
+            print("Warning: Using default Groq API key. Please set GROQ_API_KEY in settings.py")
+            return None
+        return groq.Groq(api_key=api_key)
+    except Exception as e:
+        print(f"Error initializing Groq client: {e}")
+        return None
+
+def get_current_groq_models():
+    """Get current available Groq models by checking their API"""
+    try:
+        # These are known current models as of 2024
+        current_models = [
+            "llama-3.1-70b-versatile",  # Most capable model
+            "llama-3.1-8b-instant",     # Fast, efficient model
+            "mixtral-8x7b-32768",       # Mixture of Experts (check if updated)
+            "gemma2-9b-it",             # Latest Gemma model
+            "llama3-70b-8192",          # Try the original naming pattern
+            "llama3-8b-8192",           # Try the original naming pattern
+        ]
+        
+        # Also try to fetch available models from Groq API
+        try:
+            client = get_groq_client()
+            if client:
+                models = client.models.list()
+                available_models = [model.id for model in models.data]
+                print(f"Available models from API: {available_models}")
+                return available_models
+        except:
+            pass
+            
+        return current_models
+    except Exception as e:
+        print(f"Error getting current models: {e}")
+        return ["llama-3.1-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"]
+
+def generate_groq_response(user_message, student_context, conversation_context):
+    """Generate intelligent response using Groq AI"""
+    
+    # If no message, return greeting
+    if not user_message:
+        return get_greeting_response(student_context)
+    
+    # First, try Groq API with current models
+    groq_response = try_groq_models(user_message, student_context, conversation_context)
+    if groq_response:
+        return groq_response
+    
+    # If Groq fails, try alternative free AI APIs
+    alternative_response = try_alternative_apis(user_message, student_context, conversation_context)
+    if alternative_response:
+        return alternative_response
+    
+    # Final fallback to intelligent local responses
+    return get_intelligent_fallback_response(user_message, student_context, conversation_context)
+
+def try_groq_models(user_message, student_context, conversation_context):
+    """Try different Groq models"""
+    client = get_groq_client()
+    if not client:
+        return None
+    
+    # Get current available models
+    available_models = get_current_groq_models()
+    messages = build_conversation_messages(user_message, student_context, conversation_context)
+    
+    for model in available_models:
+        try:
+            print(f"Trying Groq model: {model}")
+            response = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                temperature=0.7,
+                max_tokens=500,
+                top_p=1,
+                stream=False
+            )
+            response_text = response.choices[0].message.content.strip()
+            print(f"Success with Groq model: {model}")
+            return response_text
+            
+        except Exception as model_error:
+            print(f"Groq model {model} failed: {str(model_error)[:100]}...")
+            continue
+    
+    return None
+
+def try_alternative_apis(user_message, student_context, conversation_context):
+    """Try alternative free AI APIs if Groq fails"""
+    print("Trying alternative AI APIs...")
+    
+    # Try Hugging Face Inference API (free tier)
+    hf_response = try_huggingface_api(user_message, student_context, conversation_context)
+    if hf_response:
+        return hf_response
+    
+    # Try OpenAI-compatible local models
+    local_response = try_local_ai_api(user_message, student_context, conversation_context)
+    if local_response:
+        return local_response
+    
+    return None
+
+def try_huggingface_api(user_message, student_context, conversation_context):
+    """Try Hugging Face Inference API as fallback"""
+    try:
+        # You can use free Hugging Face inference API
+        # Note: You'll need to sign up for a free token at huggingface.co
+        api_token = getattr(settings, 'HUGGINGFACE_API_TOKEN', None)
+        if not api_token:
+            return None
+            
+        API_URL = "https://api-inference.huggingface.co/models/microsoft/DialoGPT-large"
+        headers = {"Authorization": f"Bearer {api_token}"}
+        
+        # Build prompt
+        prompt = build_huggingface_prompt(user_message, student_context, conversation_context)
+        
+        response = requests.post(API_URL, headers=headers, json={"inputs": prompt})
+        if response.status_code == 200:
+            result = response.json()
+            if isinstance(result, list) and len(result) > 0:
+                return result[0].get('generated_text', '').replace(prompt, '').strip()
+    except Exception as e:
+        print(f"Hugging Face API error: {e}")
+    
+    return None
+
+def try_local_ai_api(user_message, student_context, conversation_context):
+    """Try local AI APIs like Ollama or LM Studio"""
+    try:
+        # Try Ollama local API (if running locally)
+        ollama_response = try_ollama_api(user_message, student_context, conversation_context)
+        if ollama_response:
+            return ollama_response
+    except Exception as e:
+        print(f"Local AI API error: {e}")
+    
+    return None
+
+def try_ollama_api(user_message, student_context, conversation_context):
+    """Try Ollama local API"""
+    try:
+        # This requires Ollama to be installed and running locally
+        API_URL = "http://localhost:11434/api/generate"
+        
+        prompt = build_ollama_prompt(user_message, student_context, conversation_context)
+        
+        data = {
+            "model": "llama2",  # or any model you have installed
+            "prompt": prompt,
+            "stream": False
+        }
+        
+        response = requests.post(API_URL, json=data, timeout=30)
+        if response.status_code == 200:
+            result = response.json()
+            return result.get('response', '').strip()
+    except Exception as e:
+        print(f"Ollama API not available: {e}")
+    
+    return None
+
+def build_conversation_messages(user_message, student_context, conversation_context):
+    """Build messages array for Groq API with proper context"""
+    
+    student_name = student_context.get('student_name', 'the student')
+    overall_progress = student_context.get('progress', {}).get('avg_progress', 0)
+    completed_assignments = student_context.get('progress', {}).get('completed', 0)
+    learning_streak = student_context.get('streak', {}).get('current_streak', 0)
+    
+    system_prompt = f"""You are an intelligent, friendly learning assistant for a student named {student_name}. 
+You help with educational progress, assignments, motivation, and learning support.
+
+Student Context:
+- Overall Progress: {overall_progress}%
+- Completed Assignments: {completed_assignments}
+- Learning Streak: {learning_streak} days
+
+Your role:
+1. Be encouraging, educational, and supportive
+2. Provide accurate information about learning concepts
+3. Help with study strategies and motivation
+4. Answer questions about various subjects
+5. Be conversational but informative
+
+If the student asks about specific subjects (math, science, history, etc.), provide helpful explanations.
+If they ask about their progress, use the context above.
+Always maintain a positive, educational tone."""
+
+    messages = [
+        {"role": "system", "content": system_prompt}
+    ]
+    
+    # Add conversation history (last 5 exchanges)
+    for exchange in conversation_context[-5:]:
+        if 'user' in exchange and 'assistant' in exchange:
+            messages.append({"role": "user", "content": exchange['user']})
+            messages.append({"role": "assistant", "content": exchange['assistant']})
+    
+    # Add current message
+    messages.append({"role": "user", "content": user_message})
+    
+    return messages
+
+def build_huggingface_prompt(user_message, student_context, conversation_context):
+    """Build prompt for Hugging Face API"""
+    student_name = student_context.get('student_name', 'Student')
+    return f"""You are an AI learning assistant for {student_name}. Help with educational questions and support.
+
+User: {user_message}
+Assistant:"""
+
+def build_ollama_prompt(user_message, student_context, conversation_context):
+    """Build prompt for Ollama API"""
+    student_name = student_context.get('student_name', 'Student')
+    return f"""### Instruction:
+You are an AI learning assistant for {student_name}. Provide helpful, educational responses.
+
+### Input:
+{user_message}
+
+### Response:"""
+
+def get_greeting_response(student_context):
+    """Generate AI-powered greeting"""
+    student_name = student_context.get('student_name', 'there')
+    greetings = [
+        f"Hello {student_name}! I'm your AI learning assistant. How can I help you with your studies today?",
+        f"Hi {student_name}! Ready to explore your learning journey together? What would you like to learn about?",
+        f"Welcome back {student_name}! I'm here to assist with your educational goals. What's on your mind?",
+        f"Greetings {student_name}! I'm your learning companion. How can I support your studies today?",
+    ]
+    return random.choice(greetings)
+
+def get_intelligent_fallback_response(user_message, student_context, conversation_context):
+    """Intelligent fallback response when all APIs fail"""
+    message_lower = user_message.lower()
+    student_name = student_context.get('student_name', 'there')
+    
+    # Enhanced response patterns
+    response_patterns = {
+        # Greetings
+        ('hello', 'hi', 'hey', 'greetings'): [
+            f"Hello {student_name}! I'm your learning assistant. How can I help you today?",
+            f"Hi there {student_name}! What would you like to learn about?",
+            f"Greetings {student_name}! I'm here to help with your studies."
+        ],
+        # Progress inquiries
+        ('progress', 'how am i doing', 'my progress', 'statistics'): [
+            f"Based on your learning data, you're making great progress! Keep up the good work, {student_name}!",
+            f"You're doing well in your studies, {student_name}! Consistency is key to learning.",
+            f"Your dedication to learning is impressive, {student_name}! Keep moving forward."
+        ],
+        # Math subjects
+        ('math', 'mathematics', 'calculus', 'algebra', 'geometry'): [
+            f"Mathematics helps us understand patterns and solve problems. {student_name}, would you like help with a specific math topic?",
+            f"Math is fascinating! It includes arithmetic, algebra, geometry, and calculus. What math concept can I explain, {student_name}?",
+            f"Mathematics builds logical thinking skills. {student_name}, are you working on a particular math problem?"
+        ],
+        # Science subjects
+        ('science', 'biology', 'chemistry', 'physics'): [
+            f"Science explores how our world works! {student_name}, which science subject interests you most?",
+            f"From biology to physics, science helps us understand nature. What would you like to know, {student_name}?",
+            f"Science is all about discovery! {student_name}, are you curious about a specific scientific topic?"
+        ],
+        # Learning help
+        ('help', 'what can you do', 'capabilities'): [
+            f"I can help explain subjects, discuss your progress, provide study tips, and answer educational questions, {student_name}!",
+            f"As your learning assistant, I can help with math, science, history, study strategies, and more, {student_name}!",
+            f"I'm here to support your learning journey, {student_name}! I can explain concepts and help with study techniques."
+        ],
+        # General knowledge
+        ('what is', 'explain', 'tell me about'): [
+            f"That's an interesting topic, {student_name}! I'd be happy to explain it to you.",
+            f"I can help you understand that concept, {student_name}. What specifically would you like to know?",
+            f"That's a great learning question, {student_name}! Let me explain it clearly for you."
+        ],
+        # Motivation
+        ('motivate', 'encourage', 'inspire'): [
+            f"Remember {student_name}, every expert was once a beginner. Keep going!",
+            f"You're capable of amazing things, {student_name}! Believe in yourself and keep learning.",
+            f"Progress, not perfection, {student_name}! Every step forward is an achievement."
+        ]
+    }
+    
+    # Find matching pattern
+    for patterns, responses in response_patterns.items():
+        if any(pattern in message_lower for pattern in patterns):
+            return random.choice(responses)
+    
+    # Default educational response
+    default_responses = [
+        f"That's an interesting question, {student_name}! I'm here to help with your learning journey.",
+        f"I'd love to help you with that, {student_name}! Could you tell me more about what you'd like to learn?",
+        f"That sounds like a great learning opportunity, {student_name}! What aspect would you like to explore?",
+        f"As your learning assistant, I'm here to help with educational topics, {student_name}. What would you like to know more about?"
+    ]
+    return random.choice(default_responses)
+
+# ... keep the existing get_student_context_data and update_student_activity functions unchanged
+
+def get_student_context_data(student):
+    """Get comprehensive student data for context"""
+    try:
+        if not student:
+            return {
+                'progress': {'avg_progress': 0, 'completed': 0, 'total': 0, 'avg_score': 0, 'total_time': 0},
+                'recent_activities': [],
+                'subjects': [],
+                'streak': {'current_streak': 0, 'longest_streak': 0},
+                'student_name': 'Student'
+            }
+            
         # Progress data
         progress_data = StudentProgress.objects.filter(student=student).aggregate(
             avg_progress=Avg('progress_percentage'),
@@ -1729,14 +2088,9 @@ def get_student_context_data(student):
             total_time=Sum('time_spent')
         )
         
-        # Recent activities (limit to avoid too much data)
-        recent_activities = StudentProgress.objects.filter(
-            student=student
-        ).select_related('assignment', 'subject').order_by('-last_updated')[:3]
-        
         # Subjects progress
         subjects_data = []
-        for subject in Subject.objects.all()[:6]:  # Limit to first 6 subjects
+        for subject in Subject.objects.all()[:6]:
             subject_progress = StudentProgress.objects.filter(
                 student=student, subject=subject
             ).aggregate(
@@ -1763,7 +2117,6 @@ def get_student_context_data(student):
                 'avg_score': float(progress_data['avg_score'] or 0),
                 'total_time': progress_data['total_time'] or 0
             },
-            'recent_activities': list(recent_activities.values('assignment__title', 'subject__name', 'score', 'completed', 'last_updated')[:3]),
             'subjects': subjects_data,
             'streak': {
                 'current_streak': streak.current_streak,
@@ -1775,235 +2128,19 @@ def get_student_context_data(student):
         print(f"Error getting student context: {e}")
         return {
             'progress': {'avg_progress': 0, 'completed': 0, 'total': 0, 'avg_score': 0, 'total_time': 0},
-            'recent_activities': [],
             'subjects': [],
             'streak': {'current_streak': 0, 'longest_streak': 0},
             'student_name': student.name if student else 'Student'
         }
-
-def generate_intelligent_response(user_message, student, student_data, conversation_context):
-    """Generate context-aware intelligent responses"""
-    
-    # If no message (just opening the assistant)
-    if not user_message:
-        return get_greeting_response(student_data)
-    
-    # Convert message to lowercase for easier matching
-    message = user_message.lower()
-    
-    # Progress inquiries
-    progress_keywords = ['progress', 'how am i doing', 'my progress', 'statistics', 'how am i', 'my stats']
-    if any(keyword in message for keyword in progress_keywords):
-        return get_progress_response(student_data)
-    
-    # Subject-specific inquiries
-    subject_keywords = {
-        'math': ['math', 'mathematics', 'calculus', 'algebra', 'arithmetic'],
-        'science': ['science', 'biology', 'chemistry', 'physics', 'scientific'],
-        'reading': ['reading', 'comprehension', 'literature', 'read'],
-        'writing': ['writing', 'essay', 'composition', 'write'],
-        'arts': ['art', 'arts', 'drawing', 'painting', 'creative'],
-        'social': ['social studies', 'history', 'geography', 'social']
-    }
-    
-    for subject, keywords in subject_keywords.items():
-        if any(keyword in message for keyword in keywords):
-            return get_subject_response(subject, student_data)
-    
-    # Assignment inquiries
-    assignment_keywords = ['assignment', 'homework', 'task', 'exercise', 'work due', 'due date']
-    if any(keyword in message for keyword in assignment_keywords):
-        return get_assignment_response(student_data)
-    
-    # Motivation and encouragement
-    motivation_keywords = ['motivate', 'encourage', 'inspire', 'cheer', 'feeling down', 'discouraged']
-    if any(keyword in message for keyword in motivation_keywords):
-        return get_motivational_response(student_data)
-    
-    # Help and capabilities
-    help_keywords = ['help', 'what can you do', 'capabilities', 'what do you do', 'how can you help']
-    if any(keyword in message for keyword in help_keywords):
-        return get_help_response()
-    
-    # Time and schedule
-    time_keywords = ['time', 'schedule', 'when', 'due', 'deadline', 'when is']
-    if any(keyword in message for keyword in time_keywords):
-        return get_schedule_response(student_data)
-    
-    # Greetings and casual conversation
-    greeting_keywords = ['hello', 'hi', 'hey', 'greetings', 'good morning', 'good afternoon', 'good evening']
-    if any(keyword in message for keyword in greeting_keywords):
-        return get_greeting_response(student_data)
-    
-    # Thank you responses
-    if any(word in message for word in ['thank', 'thanks', 'appreciate']):
-        return get_thankyou_response(student_data)
-    
-    # Default response for unrecognized queries
-    return get_default_response(student_data)
-
-def get_greeting_response(student_data):
-    """Generate greeting response"""
-    greetings = [
-        f"Hello {student_data['student_name']}! I'm your learning assistant. How can I help you today?",
-        f"Hi there {student_data['student_name']}! Ready to continue your learning journey?",
-        f"Greetings {student_data['student_name']}! I'm here to assist with your progress tracking.",
-        f"Welcome back {student_data['student_name']}! What would you like to know about your progress?"
-    ]
-    return random.choice(greetings)
-
-def get_progress_response(student_data):
-    """Generate progress-based response"""
-    progress = student_data['progress']['avg_progress']
-    completed = student_data['progress']['completed']
-    total = student_data['progress']['total']
-    avg_score = student_data['progress']['avg_score']
-    streak = student_data['streak']['current_streak']
-    
-    if progress >= 90:
-        return f"Outstanding progress, {student_data['student_name']}! You've achieved {progress:.1f}% overall completion with {completed} out of {total} assignments. Your average score of {avg_score:.1f}% is excellent! Your {streak}-day learning streak is impressive!"
-    elif progress >= 70:
-        return f"Great work, {student_data['student_name']}! You're at {progress:.1f}% completion with {completed} assignments done. Average score: {avg_score:.1f}%. Keep maintaining your {streak}-day streak!"
-    elif progress >= 50:
-        return f"Good progress, {student_data['student_name']}! You've completed {progress:.1f}% of your work with {completed} assignments. Every step counts toward your learning journey!"
-    else:
-        return f"You're getting started, {student_data['student_name']}! Currently at {progress:.1f}% completion. Don't worry - every expert was once a beginner. Let's work on building momentum!"
-
-def get_subject_response(subject, student_data):
-    """Generate subject-specific response"""
-    subject_data = next((s for s in student_data['subjects'] if subject in s['name'].lower()), None)
-    
-    if subject_data:
-        progress = subject_data['progress']
-        if progress >= 80:
-            return f"You're doing excellent in {subject}! You've achieved {progress:.1f}% progress with {subject_data['completed']} assignments completed. You're mastering this subject!"
-        elif progress >= 60:
-            return f"Good work in {subject}! You're at {progress:.1f}% progress. Keep practicing to reach mastery!"
-        else:
-            return f"In {subject}, you're at {progress:.1f}% progress. Would you like some tips to improve in this area?"
-    else:
-        return f"I don't see much data for {subject} yet. Have you started any assignments in this subject?"
-
-def get_assignment_response(student_data):
-    """Generate assignment-related response"""
-    recent_activities = student_data['recent_activities']
-    
-    if recent_activities:
-        recent = recent_activities[0]
-        subject = recent.get('subject__name', 'your studies')
-        assignment = recent.get('assignment__title', 'an assignment')
-        score = recent.get('score', 'not scored yet')
-        completed = recent.get('completed', False)
-        
-        status = "completed" if completed else "worked on"
-        return f"Your most recent activity was in {subject}. You {status} {assignment} with a score of {score}%."
-    else:
-        return "I don't see any recent assignment activity. Would you like to start a new assignment?"
-
-def get_motivational_response(student_data):
-    """Generate motivational response"""
-    motivational_quotes = [
-        "The beautiful thing about learning is that no one can take it away from you. - B.B. King",
-        "Education is the most powerful weapon which you can use to change the world. - Nelson Mandela",
-        "The more that you read, the more things you will know. The more that you learn, the more places you'll go. - Dr. Seuss",
-        "Don't let what you cannot do interfere with what you can do. - John Wooden",
-        "Your education is a dress rehearsal for a life that is yours to lead. - Nora Ephron"
-    ]
-    
-    streak = student_data['streak']['current_streak']
-    quote = random.choice(motivational_quotes)
-    
-    if streak >= 7:
-        return f"{quote} And wow! Your {streak}-day learning streak is amazing! Your consistency is truly inspiring!"
-    elif streak >= 3:
-        return f"{quote} Keep going! Your {streak}-day streak shows great dedication!"
-    else:
-        return f"{quote} Remember, consistency is key to learning. You've got this!"
-
-def get_help_response():
-    """Generate help response"""
-    return """I can help you with many aspects of your learning journey! Here's what I can do:
-
-• Check your overall progress and statistics
-• Review your performance in specific subjects (Math, Science, Reading, etc.)
-• Tell you about recent assignments and activities
-• Provide motivation and learning tips
-• Answer questions about your schedule and due dates
-• Help you set and track learning goals
-
-Just ask me anything like: 
-"How am I doing in math?" 
-"What's my recent progress?" 
-"Tell me about my assignments"
-
-What would you like to know?"""
-
-def get_schedule_response(student_data):
-    """Generate schedule-related response"""
-    return "I can see you've been consistent with your learning! For detailed schedule information, check your assignment calendar. You're doing great maintaining your learning routine."
-
-def get_thankyou_response(student_data):
-    """Generate thank you response"""
-    responses = [
-        f"You're welcome, {student_data['student_name']}! I'm always here to help with your learning journey.",
-        f"Happy to help, {student_data['student_name']}! Don't hesitate to ask if you need anything else.",
-        f"Anytime, {student_data['student_name']}! Keep up the great work with your studies."
-    ]
-    return random.choice(responses)
-
-def get_default_response(student_data):
-    """Generate default response for unrecognized queries"""
-    responses = [
-        f"I'm not sure I understand that question, {student_data['student_name']}. Try asking about your progress, subjects, or assignments!",
-        f"That's an interesting question! I'm better equipped to help with your learning progress. Try asking about your recent activities or subject performance.",
-        f"I'm here to help with your learning journey, {student_data['student_name']}. You can ask me about your progress, subjects, or how you're doing in your studies!"
-    ]
-    return random.choice(responses)
 
 def update_student_activity(student):
     """Update student's learning streak and activity"""
     try:
         streak, created = LearningStreak.objects.get_or_create(student=student)
         streak.update_streak()
-        print(f"Updated student activity streak to {streak.current_streak}")  # Debug
+        print(f"Updated student activity streak to {streak.current_streak}")
     except Exception as e:
         print(f"Error updating student activity: {e}")
-
-@login_required
-def update_goal_progress(request, goal_id):
-    """Update goal progress via AJAX"""
-    if request.method == 'POST' and request.headers.get('x-requested-with') == 'XMLHttpRequest':
-        try:
-            goal = get_object_or_404(StudentGoal, id=goal_id)
-            completed = request.POST.get('completed') == 'true'
-            
-            if completed:
-                goal.completed = True
-                goal.completed_date = timezone.now()
-                goal.current_value = goal.target_value
-            else:
-                increment = request.POST.get('increment', 1)
-                goal.current_value = min(goal.target_value, goal.current_value + Decimal(increment))
-                goal.completed = goal.current_value >= goal.target_value
-                if goal.completed:
-                    goal.completed_date = timezone.now()
-            
-            goal.save()
-            
-            return JsonResponse({
-                'success': True,
-                'progress_percentage': goal.progress_percentage(),
-                'completed': goal.completed,
-                'message': 'Goal updated successfully'
-            })
-            
-        except Exception as e:
-            return JsonResponse({
-                'success': False,
-                'error': str(e)
-            })
-    
-    return JsonResponse({'success': False, 'error': 'Invalid request'})
 
 
 

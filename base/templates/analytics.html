@@ -580,94 +580,125 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     // Initialize Charts
-    document.addEventListener('DOMContentLoaded', function() {
-        // Time Spent Chart - Simplified with sample data for now
-        const timeCtx = document.getElementById('timeChart').getContext('2d');
-        const timeChart = new Chart(timeCtx, {
-            type: 'bar',
-            data: {
-                labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
-                datasets: [{
-                    label: 'Mathematics',
-                    data: [12, 19, 15, 17],
-                    backgroundColor: '#4361ee',
-                    borderColor: '#3a0ca3',
-                    borderWidth: 1
-                }, {
-                    label: 'Science',
-                    data: [8, 12, 10, 14],
-                    backgroundColor: '#4cc9f0',
-                    borderColor: '#3a0ca3',
-                    borderWidth: 1
-                }, {
-                    label: 'Language Arts',
-                    data: [10, 14, 12, 16],
-                    backgroundColor: '#4ade80',
-                    borderColor: '#22c55e',
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        title: {
-                            display: true,
-                            text: 'Hours'
+    // Initialize Charts with REAL data
+document.addEventListener('DOMContentLoaded', function() {
+    // Time Spent Chart - Using real data
+    const timeCtx = document.getElementById('timeChart').getContext('2d');
+    
+    // Prepare chart data from Django context
+    const chartLabels = {{ chart_labels|safe }};
+    const chartDatasets = [];
+    
+    {% for dataset in chart_datasets %}
+    chartDatasets.push({
+        label: '{{ dataset.label }}',
+        data: {{ dataset.data }},
+        backgroundColor: '{{ dataset.backgroundColor }}',
+        borderColor: '{{ dataset.backgroundColor }}',
+        borderWidth: 1
+    });
+    {% endfor %}
+    
+    // If no real data, use sample data
+    if (chartLabels.length === 0) {
+        chartLabels = ['Week 1', 'Week 2', 'Week 3', 'Week 4'];
+        chartDatasets = [{
+            label: 'Mathematics',
+            data: [12, 19, 15, 17],
+            backgroundColor: '#4361ee',
+            borderColor: '#3a0ca3',
+            borderWidth: 1
+        }, {
+            label: 'Science',
+            data: [8, 12, 10, 14],
+            backgroundColor: '#4cc9f0',
+            borderColor: '#3a0ca3',
+            borderWidth: 1
+        }];
+    }
+    
+    const timeChart = new Chart(timeCtx, {
+        type: 'bar',
+        data: {
+            labels: chartLabels,
+            datasets: chartDatasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Hours'
+                    }
+                }
+            }
+        }
+    });
+
+    // Accuracy Chart - Using real subject accuracy data
+    const accuracyCtx = document.getElementById('accuracyChart').getContext('2d');
+    
+    const subjectLabels = [];
+    const accuracyData = [];
+    const accuracyColors = [];
+    
+    {% for subject in subject_accuracy %}
+    subjectLabels.push('{{ subject.subject }}');
+    accuracyData.push({{ subject.accuracy }});
+    accuracyColors.push(getSubjectColor('{{ subject.subject }}'));
+    {% endfor %}
+    
+    // If no real data, use sample data
+    if (subjectLabels.length === 0) {
+        subjectLabels = ['Mathematics', 'Science', 'Language Arts'];
+        accuracyData = [85, 78, 82];
+        accuracyColors = ['#4361ee', '#4cc9f0', '#4ade80'];
+    }
+    
+    const accuracyChart = new Chart(accuracyCtx, {
+        type: 'doughnut',
+        data: {
+            labels: subjectLabels,
+            datasets: [{
+                data: accuracyData,
+                backgroundColor: accuracyColors,
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'right'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.label + ': ' + context.raw + '%';
                         }
                     }
                 }
             }
-        });
-
-        // Accuracy Chart - Simplified with sample data
-        const accuracyCtx = document.getElementById('accuracyChart').getContext('2d');
-        const accuracyChart = new Chart(accuracyCtx, {
-            type: 'doughnut',
-            data: {
-                labels: ['Mathematics', 'Science', 'Language Arts', 'Writing', 'Arts'],
-                datasets: [{
-                    data: [85, 78, 82, 75, 90],
-                    backgroundColor: [
-                        '#4361ee',
-                        '#4cc9f0',
-                        '#4ade80',
-                        '#f59e0b',
-                        '#a855f7'
-                    ],
-                    borderWidth: 2,
-                    borderColor: '#fff'
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'right'
-                    }
-                }
-            }
-        });
+        }
     });
-
-    function refreshData() {
-        window.location.reload();
+    
+    function getSubjectColor(subjectName) {
+        const colorMap = {
+            'Mathematics': '#4361ee',
+            'Science': '#4cc9f0',
+            'Reading': '#FFD166',
+            'Writing': '#06D6A0',
+            'Language Arts': '#118AB2',
+            'Arts': '#A663CC',
+            'Social Studies': '#FF9E64'
+        };
+        return colorMap[subjectName] || '#4361ee';
     }
-
-    function exportReport() {
-        alert('Export functionality would be implemented here');
-    }
-
-    function exportStudentData() {
-        alert('Student data export would be implemented here');
-    }
-
-    function changeChartView(period) {
-        // This would typically make an AJAX call to update the chart data
-        alert('Changing to ' + period + ' view');
-    }
+});
 </script>
 {% endblock %}

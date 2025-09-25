@@ -13,6 +13,8 @@ urlpatterns = [
     path('students/<int:pk>/progress/', views.update_student_progress, name='update_progress'),
     path('students/<int:pk>/analytics/', views.student_analytics, name='student_analytics'),
     path('students/export/', views.export_students, name='export_students'),
+    path('student-progress/', views.student_progress_view, name='student_progress'),
+    path('student-progress/<int:student_id>/', views.student_progress_view, name='student_progress_detail'),
 
 
     path('analytics/', views.analytics_view, name='analytics'),
@@ -26,7 +28,7 @@ urlpatterns = [
     path('progress/', views.student_progress_view, name='student_progress'),
     path('progress/<int:student_id>/', views.student_progress_view, name='student_progress_detail'),
     path('api/voice-assistant/', views.voice_assistant_api, name='voice_assistant_api'),
-    path('goals/<int:goal_id>/update/', views.update_goal_progress, name='update_goal_progress'),
+    # path('goals/<int:goal_id>/update/', views.update_student_progress, name='update_goal_progress'),
 
     path('schedule/', views.schedule_view, name='schedule'),
     path('reports/', views.reports_view, name='reports'),
