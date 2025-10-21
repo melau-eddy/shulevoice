@@ -1,0 +1,795 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Add Student - ShuleVoice{% endblock %}
+
+{% block page_title %}Add New Student{% endblock %}
+
+{% block content %}
+<div class="student-management">
+    <!-- Breadcrumb -->
+    <div class="breadcrumb" style="margin-bottom: 2rem;">
+        <a href="{% url 'dashboard' %}">Dashboard</a> 
+        <i class="fas fa-chevron-right" style="margin: 0 0.5rem;"></i> 
+        <a href="{% url 'students' %}">Students</a>
+        <i class="fas fa-chevron-right" style="margin: 0 0.5rem;"></i> 
+        <span>Add Student</span>
+    </div>
+
+    <!-- Messages -->
+    {% if messages %}
+    <div style="margin-bottom: 2rem;">
+        {% for message in messages %}
+        <div class="{% if message.tags == 'error' %}error-message{% else %}success-message{% endif %}" 
+             style="padding: 1rem; border-radius: 8px; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+            <i class="fas fa-{% if message.tags == 'error' %}exclamation-circle{% else %}check-circle{% endif %}"></i>
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Add Student Form -->
+    <div class="form-container">
+        <div class="form-card">
+            <div class="form-header">
+                <h2><i class="fas fa-user-plus" style="margin-right: 0.5rem;"></i> Student Information</h2>
+                <p>Enter the student's details to add them to the system</p>
+            </div>
+
+            <form method="POST" action="{% url 'add_student' %}" id="addStudentForm" class="student-form">
+                {% csrf_token %}
+                
+                <div class="form-section">
+                    <h3 class="section-title">
+                        <i class="fas fa-id-card"></i>
+                        Basic Information
+                    </h3>
+                    
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="name" class="form-label required">
+                                <i class="fas fa-user"></i>
+                                Full Name
+                            </label>
+                            <input type="text" 
+                                   id="name" 
+                                   name="name" 
+                                   class="form-control" 
+                                   placeholder="Enter student's full name"
+                                   value="{{ request.POST.name|default:'' }}"
+                                   required
+                                   maxlength="100">
+                            <div class="form-hint">Student's legal full name as it appears on official records</div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="student_id" class="form-label required">
+                                <i class="fas fa-fingerprint"></i>
+                                Student ID
+                            </label>
+                            <input type="text" 
+                                   id="student_id" 
+                                   name="student_id" 
+                                   class="form-control" 
+                                   placeholder="e.g., STU2024001"
+                                   value="{{ request.POST.student_id|default:'' }}"
+                                   required
+                                   maxlength="20">
+                            <div class="form-hint">Unique identifier for the student</div>
+                        </div>
+                    </div>
+
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="grade_level" class="form-label required">
+                                <i class="fas fa-graduation-cap"></i>
+                                Grade Level
+                            </label>
+                            <select id="grade_level" name="grade_level" class="form-control" required>
+                                <option value="">Select Grade Level</option>
+                                {% for grade_value, grade_name in grade_choices %}
+                                <option value="{{ grade_value }}" 
+                                        {% if request.POST.grade_level == grade_value %}selected{% endif %}>
+                                    {{ grade_name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-hint">Current academic grade level</div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="age" class="form-label">
+                                <i class="fas fa-birthday-cake"></i>
+                                Age
+                            </label>
+                            <input type="number" 
+                                   id="age" 
+                                   name="age" 
+                                   class="form-control" 
+                                   placeholder="e.g., 8"
+                                   value="{{ request.POST.age|default:'' }}"
+                                   min="4" 
+                                   max="18">
+                            <div class="form-hint">Student's current age (optional)</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3 class="section-title">
+                        <i class="fas fa-calendar-alt"></i>
+                        Enrollment Details
+                    </h3>
+                    
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="enrollment_date" class="form-label">
+                                <i class="fas fa-calendar-check"></i>
+                                Enrollment Date
+                            </label>
+                            <input type="date" 
+                                   id="enrollment_date" 
+                                   name="enrollment_date" 
+                                   class="form-control"
+                                   value="{{ request.POST.enrollment_date|default:'' }}">
+                            <div class="form-hint">Date when student was enrolled (defaults to today)</div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">
+                                <i class="fas fa-user-check"></i>
+                                Status
+                            </label>
+                            <div class="status-toggle">
+                                <label class="toggle-item">
+                                    <input type="radio" name="status" value="active" checked>
+                                    <span class="toggle-label active">
+                                        <i class="fas fa-check-circle"></i>
+                                        Active
+                                    </span>
+                                </label>
+                                <label class="toggle-item">
+                                    <input type="radio" name="status" value="inactive">
+                                    <span class="toggle-label">
+                                        <i class="fas fa-pause-circle"></i>
+                                        Inactive
+                                    </span>
+                                </label>
+                            </div>
+                            <div class="form-hint">Student's current enrollment status</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3 class="section-title">
+                        <i class="fas fa-sticky-note"></i>
+                        Additional Information
+                    </h3>
+                    
+                    <div class="form-group">
+                        <label for="notes" class="form-label">
+                            <i class="fas fa-edit"></i>
+                            Notes
+                        </label>
+                        <textarea id="notes" 
+                                  name="notes" 
+                                  class="form-control" 
+                                  placeholder="Any additional notes about the student (allergies, special needs, interests, etc.)"
+                                  rows="4">{{ request.POST.notes|default:'' }}</textarea>
+                        <div class="form-hint">Optional notes for reference</div>
+                    </div>
+                </div>
+
+                <!-- Form Actions -->
+                <div class="form-actions">
+                    <a href="{% url 'students' %}" class="btn btn-outline">
+                        <i class="fas fa-arrow-left"></i>
+                        Back to Students
+                    </a>
+                    <button type="button" onclick="clearForm()" class="btn btn-outline">
+                        <i class="fas fa-undo"></i>
+                        Clear Form
+                    </button>
+                    <button type="submit" class="btn btn-primary" id="submitBtn">
+                        <i class="fas fa-user-plus"></i>
+                        Add Student
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Quick Help Card -->
+        <div class="help-card">
+            <h3><i class="fas fa-lightbulb"></i> Quick Tips</h3>
+            <ul class="tip-list">
+                <li>
+                    <i class="fas fa-check-circle"></i>
+                    <strong>Student ID must be unique</strong> - This identifier will be used throughout the system
+                </li>
+                <li>
+                    <i class="fas fa-check-circle"></i>
+                    <strong>Grade level determines curriculum</strong> - Assign the correct grade for proper progress tracking
+                </li>
+                <li>
+                    <i class="fas fa-check-circle"></i>
+                    <strong>Use notes for important information</strong> - Medical conditions, learning preferences, etc.
+                </li>
+                <li>
+                    <i class="fas fa-check-circle"></i>
+                    <strong>Inactive students</strong> - Use for students who have left or are on extended leave
+                </li>
+            </ul>
+            
+            <div class="demo-credentials" style="margin-top: 1.5rem; padding: 1rem; background: var(--light); border-radius: 8px;">
+                <h4 style="margin-bottom: 0.5rem; color: var(--primary);">
+                    <i class="fas fa-rocket"></i> Quick Start
+                </h4>
+                <p style="font-size: 0.9rem; color: var(--gray); margin: 0;">
+                    Only <strong>Name</strong>, <strong>Student ID</strong>, and <strong>Grade Level</strong> are required to get started.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .form-container {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 2rem;
+        margin-bottom: 2rem;
+    }
+
+    .form-card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        overflow: hidden;
+    }
+
+    .form-header {
+        padding: 2rem;
+        background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+        border-bottom: 1px solid var(--light-gray);
+    }
+
+    .form-header h2 {
+        color: var(--dark);
+        margin-bottom: 0.5rem;
+        font-size: 1.5rem;
+    }
+
+    .form-header p {
+        color: var(--gray);
+        margin: 0;
+    }
+
+    .student-form {
+        padding: 0 2rem 2rem;
+    }
+
+    .form-section {
+        margin-bottom: 2rem;
+        padding-bottom: 2rem;
+        border-bottom: 1px solid var(--light-gray);
+    }
+
+    .form-section:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+    }
+
+    .section-title {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: var(--primary);
+        margin-bottom: 1.5rem;
+        font-size: 1.1rem;
+    }
+
+    .section-title i {
+        width: 20px;
+        text-align: center;
+    }
+
+    .form-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .form-group {
+        margin-bottom: 1rem;
+    }
+
+    .form-label {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.5rem;
+        font-weight: 600;
+        color: var(--dark);
+    }
+
+    .form-label.required::after {
+        content: '*';
+        color: var(--danger);
+        margin-left: 2px;
+    }
+
+    .form-label i {
+        width: 16px;
+        text-align: center;
+        color: var(--primary);
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 0.75rem 1rem;
+        border: 2px solid var(--light-gray);
+        border-radius: 8px;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+        background: white;
+    }
+
+    .form-control:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.1);
+    }
+
+    .form-control:invalid {
+        border-color: var(--danger);
+    }
+
+    .form-hint {
+        font-size: 0.8rem;
+        color: var(--gray);
+        margin-top: 0.3rem;
+        line-height: 1.4;
+    }
+
+    .status-toggle {
+        display: flex;
+        gap: 1rem;
+        margin-top: 0.5rem;
+    }
+
+    .toggle-item {
+        cursor: pointer;
+    }
+
+    .toggle-item input {
+        display: none;
+    }
+
+    .toggle-label {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        border: 2px solid var(--light-gray);
+        border-radius: 6px;
+        transition: all 0.3s ease;
+        background: white;
+    }
+
+    .toggle-label.active {
+        background: var(--primary);
+        color: white;
+        border-color: var(--primary);
+    }
+
+    .toggle-item input:checked + .toggle-label {
+        background: var(--primary);
+        color: white;
+        border-color: var(--primary);
+    }
+
+    textarea.form-control {
+        resize: vertical;
+        min-height: 100px;
+    }
+
+    .form-actions {
+        display: flex;
+        gap: 1rem;
+        justify-content: flex-end;
+        padding-top: 2rem;
+        border-top: 1px solid var(--light-gray);
+        margin-top: 2rem;
+    }
+
+    .help-card {
+        background: white;
+        border-radius: 12px;
+        padding: 2rem;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        height: fit-content;
+        position: sticky;
+        top: 2rem;
+    }
+
+    .help-card h3 {
+        color: var(--dark);
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .tip-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .tip-list li {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+        padding: 0.75rem;
+        background: var(--light);
+        border-radius: 6px;
+        border-left: 3px solid var(--success);
+    }
+
+    .tip-list li i {
+        color: var(--success);
+        margin-top: 0.1rem;
+        flex-shrink: 0;
+    }
+
+    .tip-list li strong {
+        color: var(--dark);
+    }
+
+    /* Error states */
+    .error {
+        border-color: var(--danger) !important;
+    }
+
+    .error-message {
+        background: #fee;
+        border: 1px solid var(--danger);
+        color: var(--danger);
+        border-radius: 8px;
+    }
+
+    .success-message {
+        background: #f0fff4;
+        border: 1px solid var(--success);
+        color: var(--success);
+        border-radius: 8px;
+    }
+
+    /* Responsive Design */
+    @media (max-width: 1200px) {
+        .form-container {
+            grid-template-columns: 1fr;
+        }
+        
+        .help-card {
+            order: -1;
+            position: static;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .form-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .form-actions {
+            flex-direction: column;
+        }
+        
+        .student-form {
+            padding: 0 1.5rem 1.5rem;
+        }
+        
+        .form-header {
+            padding: 1.5rem;
+        }
+        
+        .status-toggle {
+            flex-direction: column;
+        }
+    }
+
+    @media (max-width: 576px) {
+        .form-container {
+            gap: 1rem;
+        }
+        
+        .help-card {
+            padding: 1.5rem;
+        }
+    }
+
+    /* Animation */
+    @keyframes slideIn {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .form-card, .help-card {
+        animation: slideIn 0.6s ease-out;
+    }
+
+    /* Loading state */
+    .btn-loading {
+        opacity: 0.7;
+        pointer-events: none;
+    }
+
+    .btn-loading i {
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.getElementById('addStudentForm');
+        const submitBtn = document.getElementById('submitBtn');
+
+        // Real-time validation
+        const requiredFields = form.querySelectorAll('[required]');
+        requiredFields.forEach(field => {
+            field.addEventListener('blur', function() {
+                validateField(this);
+            });
+            
+            field.addEventListener('input', function() {
+                if (this.value.trim() !== '') {
+                    this.classList.remove('error');
+                }
+            });
+        });
+
+        // Student ID uniqueness check (simulated)
+        const studentIdField = document.getElementById('student_id');
+        if (studentIdField) {
+            studentIdField.addEventListener('blur', function() {
+                // In a real implementation, this would make an AJAX call to check uniqueness
+                if (this.value.trim().length > 0) {
+                    // Simulate uniqueness check
+                    setTimeout(() => {
+                        if (this.value.toLowerCase().includes('duplicate')) {
+                            showFieldError(this, 'This Student ID is already in use');
+                        } else {
+                            clearFieldError(this);
+                        }
+                    }, 500);
+                }
+            });
+        }
+
+        // Form submission handling
+        if (form && submitBtn) {
+            form.addEventListener('submit', function(e) {
+                // Client-side validation
+                let isValid = true;
+                requiredFields.forEach(field => {
+                    if (!validateField(field)) {
+                        isValid = false;
+                    }
+                });
+
+                if (!isValid) {
+                    e.preventDefault();
+                    showNotification('Please correct the errors before submitting', 'error');
+                    return false;
+                }
+
+                // Show loading state
+                submitBtn.classList.add('btn-loading');
+                submitBtn.innerHTML = '<i class="fas fa-spinner"></i> Adding Student...';
+            });
+        }
+
+        // Set default enrollment date to today
+        const enrollmentDateField = document.getElementById('enrollment_date');
+        if (enrollmentDateField && !enrollmentDateField.value) {
+            const today = new Date().toISOString().split('T')[0];
+            enrollmentDateField.value = today;
+        }
+
+        // Status toggle functionality
+        const statusRadios = document.querySelectorAll('input[name="status"]');
+        statusRadios.forEach(radio => {
+            radio.addEventListener('change', function() {
+                // Update the visual state
+                document.querySelectorAll('.toggle-label').forEach(label => {
+                    label.classList.remove('active');
+                });
+                this.nextElementSibling.classList.add('active');
+                
+                // Set the is_active value for form submission
+                const isActiveInput = document.createElement('input');
+                isActiveInput.type = 'hidden';
+                isActiveInput.name = 'is_active';
+                isActiveInput.value = this.value === 'active' ? 'on' : '';
+                
+                // Remove existing hidden input if any
+                const existingInput = document.querySelector('input[name="is_active"]');
+                if (existingInput) {
+                    existingInput.remove();
+                }
+                
+                form.appendChild(isActiveInput);
+            });
+        });
+
+        // Initialize status toggle
+        if (statusRadios.length > 0) {
+            const activeRadio = document.querySelector('input[name="status"][value="active"]');
+            if (activeRadio) {
+                activeRadio.checked = true;
+                activeRadio.dispatchEvent(new Event('change'));
+            }
+        }
+    });
+
+    function validateField(field) {
+        const value = field.value.trim();
+        let isValid = true;
+        let errorMessage = '';
+
+        // Required field validation
+        if (field.hasAttribute('required') && value === '') {
+            isValid = false;
+            errorMessage = 'This field is required';
+        }
+
+        // Specific field validations
+        if (field.id === 'student_id' && value !== '') {
+            if (value.length < 3) {
+                isValid = false;
+                errorMessage = 'Student ID must be at least 3 characters';
+            } else if (!/^[a-zA-Z0-9_-]+$/.test(value)) {
+                isValid = false;
+                errorMessage = 'Student ID can only contain letters, numbers, hyphens, and underscores';
+            }
+        }
+
+        if (field.id === 'age' && value !== '') {
+            const age = parseInt(value);
+            if (age < 4 || age > 18) {
+                isValid = false;
+                errorMessage = 'Age must be between 4 and 18';
+            }
+        }
+
+        if (field.id === 'name' && value !== '') {
+            if (value.length < 2) {
+                isValid = false;
+                errorMessage = 'Name must be at least 2 characters';
+            } else if (!/^[a-zA-Z\s]+$/.test(value)) {
+                isValid = false;
+                errorMessage = 'Name can only contain letters and spaces';
+            }
+        }
+
+        // Update field state
+        if (!isValid) {
+            showFieldError(field, errorMessage);
+        } else {
+            clearFieldError(field);
+        }
+
+        return isValid;
+    }
+
+    function showFieldError(field, message) {
+        field.classList.add('error');
+        
+        // Remove existing error message
+        const existingError = field.parentNode.querySelector('.field-error');
+        if (existingError) {
+            existingError.remove();
+        }
+        
+        // Add new error message
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'field-error';
+        errorDiv.innerHTML = `<i class="fas fa-exclamation-circle"></i> ${message}`;
+        errorDiv.style.cssText = 'color: var(--danger); font-size: 0.8rem; margin-top: 0.3rem; display: flex; align-items: center; gap: 0.3rem;';
+        
+        field.parentNode.appendChild(errorDiv);
+    }
+
+    function clearFieldError(field) {
+        field.classList.remove('error');
+        const errorDiv = field.parentNode.querySelector('.field-error');
+        if (errorDiv) {
+            errorDiv.remove();
+        }
+    }
+
+    function clearForm() {
+        if (confirm('Are you sure you want to clear all form data?')) {
+            document.getElementById('addStudentForm').reset();
+            
+            // Clear any error messages
+            document.querySelectorAll('.field-error').forEach(error => error.remove());
+            document.querySelectorAll('.error').forEach(field => field.classList.remove('error'));
+            
+            // Reset enrollment date to today
+            const enrollmentDateField = document.getElementById('enrollment_date');
+            if (enrollmentDateField) {
+                const today = new Date().toISOString().split('T')[0];
+                enrollmentDateField.value = today;
+            }
+            
+            // Reset status toggle
+            const activeRadio = document.querySelector('input[name="status"][value="active"]');
+            if (activeRadio) {
+                activeRadio.checked = true;
+                activeRadio.dispatchEvent(new Event('change'));
+            }
+            
+            showNotification('Form cleared successfully', 'success');
+        }
+    }
+
+    function showNotification(message, type) {
+        // Create notification element
+        const notification = document.createElement('div');
+        notification.className = type === 'error' ? 'error-message' : 'success-message';
+        notification.style.cssText = 'padding: 1rem; border-radius: 8px; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;';
+        notification.innerHTML = `
+            <i class="fas fa-${type === 'error' ? 'exclamation-circle' : 'check-circle'}"></i>
+            ${message}
+        `;
+        
+        // Insert before the form
+        const formContainer = document.querySelector('.form-container');
+        formContainer.parentNode.insertBefore(notification, formContainer);
+        
+        // Remove after 5 seconds
+        setTimeout(() => {
+            notification.remove();
+        }, 5000);
+    }
+
+    // Auto-format student ID to uppercase
+    document.getElementById('student_id')?.addEventListener('input', function(e) {
+        this.value = this.value.toUpperCase();
+    });
+
+    // Prevent form submission on Enter key in textareas
+    document.querySelectorAll('textarea').forEach(textarea => {
+        textarea.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && e.ctrlKey) {
+                // Allow Ctrl+Enter to submit
+                return;
+            } else if (e.key === 'Enter') {
+                // Prevent default Enter behavior in textareas
+                e.stopPropagation();
+            }
+        });
+    });
+</script>
+{% endblock %}

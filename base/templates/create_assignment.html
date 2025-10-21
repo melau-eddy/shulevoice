@@ -1,0 +1,812 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}ShuleVoice | Create Assignment{% endblock %}
+
+{% block page_title %}Create New Assignment{% endblock %}
+
+{% block extra_css %}
+<style>
+    .create-assignment {
+        padding: 2rem;
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+    }
+
+    .page-title h2 {
+        font-size: 1.8rem;
+        font-weight: 600;
+        color: var(--dark);
+        margin-bottom: 0.5rem;
+    }
+
+    .page-title p {
+        color: var(--gray);
+    }
+
+    .btn {
+        padding: 0.6rem 1.2rem;
+        border-radius: 6px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        border: none;
+        font-size: 0.9rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        text-decoration: none;
+    }
+
+    .btn-outline {
+        background: transparent;
+        border: 1px solid var(--light-gray);
+        color: var(--gray);
+    }
+
+    .btn-primary {
+        background-color: var(--primary);
+        color: white;
+    }
+
+    .btn-success {
+        background-color: var(--success);
+        color: white;
+    }
+
+    .btn-outline:hover {
+        background-color: var(--light-gray);
+    }
+
+    .btn-primary:hover {
+        background-color: #3651d4;
+    }
+
+    .btn-success:hover {
+        background-color: #22c55e;
+    }
+
+    .assignment-form-container {
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        overflow: hidden;
+    }
+
+    .form-tabs {
+        display: flex;
+        background: var(--light);
+        border-bottom: 1px solid var(--light-gray);
+    }
+
+    .form-tab {
+        padding: 1rem 2rem;
+        cursor: pointer;
+        border-bottom: 3px solid transparent;
+        transition: all 0.3s ease;
+        font-weight: 500;
+    }
+
+    .form-tab.active {
+        border-bottom-color: var(--primary);
+        color: var(--primary);
+        background: white;
+    }
+
+    .form-tab:hover:not(.active) {
+        background: rgba(67, 97, 238, 0.1);
+    }
+
+    .form-content {
+        padding: 2rem;
+    }
+
+    .tab-content {
+        display: none;
+    }
+
+    .tab-content.active {
+        display: block;
+    }
+
+    .form-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .form-group.full-width {
+        grid-column: 1 / -1;
+    }
+
+    .form-label {
+        font-weight: 600;
+        color: var(--dark);
+        font-size: 0.9rem;
+    }
+
+    .form-required {
+        color: var(--danger);
+    }
+
+    .form-input, .form-select, .form-textarea {
+        padding: 0.75rem;
+        border: 1px solid var(--light-gray);
+        border-radius: 6px;
+        font-size: 0.9rem;
+        transition: all 0.3s ease;
+    }
+
+    .form-input:focus, .form-select:focus, .form-textarea:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.1);
+    }
+
+    .form-textarea {
+        min-height: 100px;
+        resize: vertical;
+    }
+
+    .form-help {
+        font-size: 0.8rem;
+        color: var(--gray);
+        margin-top: 0.25rem;
+    }
+
+    .assignment-type-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .type-card {
+        border: 2px solid var(--light-gray);
+        border-radius: 8px;
+        padding: 1.5rem;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .type-card:hover {
+        border-color: var(--primary);
+        transform: translateY(-2px);
+    }
+
+    .type-card.selected {
+        border-color: var(--primary);
+        background: rgba(67, 97, 238, 0.05);
+    }
+
+    .type-icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background: var(--light);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1rem;
+        font-size: 1.5rem;
+        color: var(--primary);
+    }
+
+    .type-card.selected .type-icon {
+        background: var(--primary);
+        color: white;
+    }
+
+    .type-card h4 {
+        margin-bottom: 0.5rem;
+        font-weight: 600;
+    }
+
+    .type-card p {
+        font-size: 0.8rem;
+        color: var(--gray);
+    }
+
+    .students-selection {
+        background: var(--light);
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .students-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 1rem;
+        max-height: 300px;
+        overflow-y: auto;
+        margin-top: 1rem;
+        padding: 1rem;
+        background: white;
+        border-radius: 6px;
+    }
+
+    .student-checkbox {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem;
+        border: 1px solid var(--light-gray);
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .student-checkbox:hover {
+        border-color: var(--primary);
+        background: rgba(67, 97, 238, 0.05);
+    }
+
+    .student-checkbox.selected {
+        border-color: var(--primary);
+        background: rgba(67, 97, 238, 0.1);
+    }
+
+    .student-avatar {
+        width: 35px;
+        height: 35px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--primary), var(--accent));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+        font-size: 0.8rem;
+    }
+
+    .student-info h4 {
+        font-size: 0.9rem;
+        font-weight: 600;
+        margin-bottom: 0.1rem;
+    }
+
+    .student-info p {
+        font-size: 0.8rem;
+        color: var(--gray);
+    }
+
+    .voice-preview {
+        background: var(--light);
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-top: 1rem;
+    }
+
+    .voice-preview h4 {
+        margin-bottom: 1rem;
+        font-weight: 600;
+    }
+
+    .preview-text {
+        background: white;
+        padding: 1rem;
+        border-radius: 6px;
+        border-left: 4px solid var(--accent);
+        font-style: italic;
+        margin-bottom: 1rem;
+    }
+
+    .form-actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1.5rem 2rem;
+        background: var(--light);
+        border-top: 1px solid var(--light-gray);
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 1rem;
+    }
+
+    .form-step-indicator {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.9rem;
+        color: var(--gray);
+    }
+
+    .step-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--light-gray);
+    }
+
+    .step-dot.active {
+        background: var(--primary);
+    }
+
+    .error-message {
+        color: var(--danger);
+        font-size: 0.8rem;
+        margin-top: 0.25rem;
+        display: none;
+    }
+
+    .form-input.error, .form-select.error, .form-textarea.error {
+        border-color: var(--danger);
+    }
+
+    .form-input.error + .error-message,
+    .form-select.error + .error-message,
+    .form-textarea.error + .error-message {
+        display: block;
+    }
+
+    @media (max-width: 768px) {
+        .form-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .form-tabs {
+            flex-direction: column;
+        }
+        
+        .form-tab {
+            padding: 1rem;
+            text-align: center;
+        }
+        
+        .assignment-type-cards {
+            grid-template-columns: 1fr;
+        }
+        
+        .students-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .form-actions {
+            flex-direction: column;
+            gap: 1rem;
+            align-items: stretch;
+        }
+        
+        .action-buttons {
+            justify-content: space-between;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="create-assignment">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="page-title">
+            <h2>Create New Assignment</h2>
+            <p>Design and configure assignments for your students</p>
+        </div>
+        <a href="{% url 'assignments' %}" class="btn btn-outline">
+            <i class="fas fa-arrow-left"></i> Back to Assignments
+        </a>
+    </div>
+
+    <!-- Messages Display -->
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}" style="
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            border-radius: 6px;
+            background: {% if message.tags == 'success' %}#d4edda{% elif message.tags == 'error' %}#f8d7da{% else %}#fff3cd{% endif %};
+            color: {% if message.tags == 'success' %}#155724{% elif message.tags == 'error' %}#721c24{% else %}#856404{% endif %};
+            border: 1px solid {% if message.tags == 'success' %}#c3e6cb{% elif message.tags == 'error' %}#f5c6cb{% else %}#ffeaa7{% endif %};
+        ">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Assignment Form -->
+    <div class="assignment-form-container">
+        <div class="form-tabs">
+            <div class="form-tab active" data-tab="basic">Basic Information</div>
+            <div class="form-tab" data-tab="content">Assignment Content</div>
+            <div class="form-tab" data-tab="students">Student Selection</div>
+            <div class="form-tab" data-tab="review">Review & Create</div>
+        </div>
+
+        <form method="POST" class="form-content">
+            {% csrf_token %}
+            
+            <!-- Basic Information Tab -->
+            <div class="tab-content active" id="basic-tab">
+                <h3 style="margin-bottom: 1.5rem; color: var(--dark);">Basic Assignment Information</h3>
+                
+                <div class="form-grid">
+                    <div class="form-group full-width">
+                        <label for="title" class="form-label">
+                            Assignment Title <span class="form-required">*</span>
+                        </label>
+                        <input type="text" id="title" name="title" class="form-input" 
+                               placeholder="e.g., Basic Addition Practice" required
+                               value="{{ request.POST.title }}">
+                        <div class="error-message">Please enter an assignment title</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="subject" class="form-label">
+                            Subject <span class="form-required">*</span>
+                        </label>
+                        <select id="subject" name="subject" class="form-select" required>
+                            <option value="">Select a subject</option>
+                            {% for subject in subjects %}
+                            <option value="{{ subject.id }}" 
+                                    {% if request.POST.subject == subject.id|stringformat:"i" %}selected{% endif %}>
+                                {{ subject.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <div class="error-message">Please select a subject</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="assignment_type" class="form-label">Assignment Type</label>
+                        <select id="assignment_type" name="assignment_type" class="form-select">
+                            <option value="standard" {% if request.POST.assignment_type == 'standard' %}selected{% endif %}>Standard Assignment</option>
+                            <option value="voice" {% if request.POST.assignment_type == 'voice' %}selected{% endif %}>Voice-Activated</option>
+                            <option value="interactive" {% if request.POST.assignment_type == 'interactive' %}selected{% endif %}>Interactive Quiz</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="due_date" class="form-label">
+                            Due Date <span class="form-required">*</span>
+                        </label>
+                        <input type="datetime-local" id="due_date" name="due_date" class="form-input" required
+                               value="{{ request.POST.due_date }}">
+                        <div class="error-message">Please select a due date</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="max_score" class="form-label">Maximum Score</label>
+                        <input type="number" id="max_score" name="max_score" class="form-input" 
+                               min="1" max="1000" value="{{ request.POST.max_score|default:'100' }}">
+                        <div class="form-help">Maximum points achievable</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="estimated_duration" class="form-label">Estimated Duration</label>
+                        <input type="number" id="estimated_duration" name="estimated_duration" class="form-input" 
+                               min="1" max="480" value="{{ request.POST.estimated_duration|default:'30' }}">
+                        <div class="form-help">Duration in minutes</div>
+                    </div>
+
+                    <div class="form-group full-width">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea id="description" name="description" class="form-textarea" 
+                                  placeholder="Brief description of the assignment...">{{ request.POST.description }}</textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Assignment Content Tab -->
+            <div class="tab-content" id="content-tab">
+                <h3 style="margin-bottom: 1.5rem; color: var(--dark);">Assignment Content</h3>
+                
+                <div class="form-group full-width">
+                    <label for="instructions" class="form-label">
+                        Instructions <span class="form-required">*</span>
+                    </label>
+                    <textarea id="instructions" name="instructions" class="form-textarea" 
+                              placeholder="Detailed instructions for students..." 
+                              required>{{ request.POST.instructions }}</textarea>
+                    <div class="error-message">Please provide assignment instructions</div>
+                </div>
+
+                <!-- Voice-specific content (shown only for voice assignments) -->
+                <div id="voice-content" style="display: none;">
+                    <div class="form-group full-width">
+                        <label for="voice_prompt" class="form-label">Voice Prompt</label>
+                        <textarea id="voice_prompt" name="voice_prompt" class="form-textarea" 
+                                  placeholder="What the voice assistant will say to students...">{{ request.POST.voice_prompt }}</textarea>
+                        <div class="form-help">This prompt will be read aloud to students</div>
+                    </div>
+
+                    <div class="voice-preview">
+                        <h4>Voice Prompt Preview</h4>
+                        <div class="preview-text" id="voice-preview">
+                            Prompt preview will appear here...
+                        </div>
+                        <button type="button" class="btn btn-outline" onclick="testVoicePrompt()">
+                            <i class="fas fa-volume-up"></i> Test Voice Prompt
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Expected responses for voice assignments -->
+                <div id="expected-responses" style="display: none; margin-top: 1.5rem;">
+                    <div class="form-group full-width">
+                        <label class="form-label">Expected Responses</label>
+                        <div class="form-help">Add expected voice responses (one per line)</div>
+                        <textarea name="expected_responses" class="form-textarea" 
+                                  placeholder="Expected answer 1&#10;Expected answer 2&#10;...">{{ request.POST.expected_responses }}</textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Student Selection Tab -->
+            <div class="tab-content" id="students-tab">
+                <h3 style="margin-bottom: 1.5rem; color: var(--dark);">Assign to Students</h3>
+                
+                <div class="students-selection">
+                    <div class="form-group">
+                        <label for="target_grade_levels" class="form-label">Target Grade Levels</label>
+                        <select id="target_grade_levels" name="target_grade_levels" class="form-select" multiple style="height: auto;">
+                            {% for grade_code, grade_name in Student.GRADE_LEVELS %}
+                            <option value="{{ grade_name }}"
+                                    {% if grade_name in request.POST.target_grade_levels %}selected{% endif %}>
+                                {{ grade_name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-help">Hold Ctrl/Cmd to select multiple grades</div>
+                    </div>
+
+                    <div class="form-group full-width">
+                        <label class="form-label">Select Individual Students</label>
+                        <div class="students-grid" id="students-grid">
+                            <!-- Students will be loaded via JavaScript -->
+                            <div style="text-align: center; padding: 2rem; color: var(--gray);">
+                                <i class="fas fa-spinner fa-spin"></i> Loading students...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Review Tab -->
+            <div class="tab-content" id="review-tab">
+                <h3 style="margin-bottom: 1.5rem; color: var(--dark);">Review Assignment</h3>
+                
+                <div class="review-summary" style="background: var(--light); padding: 1.5rem; border-radius: 8px;">
+                    <h4 style="margin-bottom: 1rem;">Assignment Summary</h4>
+                    
+                    <div class="summary-grid" style="display: grid; grid-template-columns: auto 1fr; gap: 1rem; align-items: start;">
+                        <strong>Title:</strong>
+                        <span id="review-title">-</span>
+                        
+                        <strong>Subject:</strong>
+                        <span id="review-subject">-</span>
+                        
+                        <strong>Type:</strong>
+                        <span id="review-type">-</span>
+                        
+                        <strong>Due Date:</strong>
+                        <span id="review-due">-</span>
+                        
+                        <strong>Duration:</strong>
+                        <span id="review-duration">-</span>
+                        
+                        <strong>Students:</strong>
+                        <span id="review-students">-</span>
+                    </div>
+                    
+                    <div style="margin-top: 1.5rem; padding: 1rem; background: white; border-radius: 6px;">
+                        <strong>Instructions Preview:</strong>
+                        <p id="review-instructions" style="margin-top: 0.5rem; font-style: italic;"></p>
+                    </div>
+                </div>
+
+                <div class="form-group full-width" style="margin-top: 1.5rem;">
+                    <label class="form-label">
+                        <input type="checkbox" id="confirm_creation" required>
+                        I confirm that this assignment is ready to be created and assigned to students.
+                    </label>
+                    <div class="error-message">Please confirm before creating the assignment</div>
+                </div>
+            </div>
+
+            <!-- Form Actions -->
+            <div class="form-actions">
+                <div class="form-step-indicator">
+                    <span>Step </span>
+                    <div class="step-dot active" data-step="1"></div>
+                    <div class="step-dot" data-step="2"></div>
+                    <div class="step-dot" data-step="3"></div>
+                    <div class="step-dot" data-step="4"></div>
+                </div>
+                
+                <div class="action-buttons">
+                    <button type="button" class="btn btn-outline" id="prev-btn" style="display: none;">
+                        <i class="fas fa-arrow-left"></i> Previous
+                    </button>
+                    <button type="button" class="btn btn-primary" id="next-btn">
+                        Next <i class="fas fa-arrow-right"></i>
+                    </button>
+                    <button type="submit" class="btn btn-success" id="submit-btn" style="display: none;">
+                        <i class="fas fa-check"></i> Create Assignment
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Tab navigation
+        const tabs = document.querySelectorAll('.form-tab');
+        const tabContents = document.querySelectorAll('.tab-content');
+        const stepDots = document.querySelectorAll('.step-dot');
+        const prevBtn = document.getElementById('prev-btn');
+        const nextBtn = document.getElementById('next-btn');
+        const submitBtn = document.getElementById('submit-btn');
+        
+        let currentTab = 0;
+        
+        function showTab(index) {
+            // Hide all tabs
+            tabContents.forEach(content => content.classList.remove('active'));
+            tabs.forEach(tab => tab.classList.remove('active'));
+            stepDots.forEach(dot => dot.classList.remove('active'));
+            
+            // Show current tab
+            tabContents[index].classList.add('active');
+            tabs[index].classList.add('active');
+            stepDots[index].classList.add('active');
+            
+            // Update buttons
+            prevBtn.style.display = index === 0 ? 'none' : 'flex';
+            nextBtn.style.display = index === tabContents.length - 1 ? 'none' : 'flex';
+            submitBtn.style.display = index === tabContents.length - 1 ? 'flex' : 'none';
+            
+            currentTab = index;
+            
+            // Update review tab content
+            if (index === 3) {
+                updateReviewSummary();
+            }
+        }
+        
+        // Tab click events
+        tabs.forEach((tab, index) => {
+            tab.addEventListener('click', () => {
+                if (validateTab(currentTab)) {
+                    showTab(index);
+                }
+            });
+        });
+        
+        // Navigation buttons
+        nextBtn.addEventListener('click', () => {
+            if (validateTab(currentTab)) {
+                showTab(currentTab + 1);
+            }
+        });
+        
+        prevBtn.addEventListener('click', () => {
+            showTab(currentTab - 1);
+        });
+        
+        // Assignment type change
+        const assignmentTypeSelect = document.getElementById('assignment_type');
+        const voiceContent = document.getElementById('voice-content');
+        const expectedResponses = document.getElementById('expected-responses');
+        
+        assignmentTypeSelect.addEventListener('change', function() {
+            if (this.value === 'voice') {
+                voiceContent.style.display = 'block';
+                expectedResponses.style.display = 'block';
+            } else {
+                voiceContent.style.display = 'none';
+                expectedResponses.style.display = 'none';
+            }
+        });
+        
+        // Voice prompt preview
+        const voicePromptTextarea = document.getElementById('voice_prompt');
+        const voicePreview = document.getElementById('voice-preview');
+        
+        if (voicePromptTextarea) {
+            voicePromptTextarea.addEventListener('input', function() {
+                voicePreview.textContent = this.value || 'Prompt preview will appear here...';
+            });
+        }
+        
+        // Load students for selection
+        function loadStudents() {
+            // In a real implementation, this would fetch students via AJAX
+            const studentsGrid = document.getElementById('students-grid');
+            studentsGrid.innerHTML = `
+                <div style="text-align: center; padding: 1rem; color: var(--gray);">
+                    <i class="fas fa-users"></i> Student selection will be implemented with real data
+                </div>
+            `;
+        }
+        
+        // Form validation
+        function validateTab(tabIndex) {
+            let isValid = true;
+            const currentTabContent = tabContents[tabIndex];
+            
+            // Basic info validation
+            if (tabIndex === 0) {
+                const requiredFields = currentTabContent.querySelectorAll('[required]');
+                requiredFields.forEach(field => {
+                    if (!field.value.trim()) {
+                        field.classList.add('error');
+                        isValid = false;
+                    } else {
+                        field.classList.remove('error');
+                    }
+                });
+            }
+            
+            // Content validation
+            if (tabIndex === 1) {
+                const instructions = document.getElementById('instructions');
+                if (!instructions.value.trim()) {
+                    instructions.classList.add('error');
+                    isValid = false;
+                } else {
+                    instructions.classList.remove('error');
+                }
+            }
+            
+            return isValid;
+        }
+        
+        // Update review summary
+        function updateReviewSummary() {
+            document.getElementById('review-title').textContent = document.getElementById('title').value || '-';
+            document.getElementById('review-subject').textContent = 
+                document.getElementById('subject').options[document.getElementById('subject').selectedIndex]?.text || '-';
+            document.getElementById('review-type').textContent = 
+                document.getElementById('assignment_type').options[document.getElementById('assignment_type').selectedIndex]?.text || '-';
+            document.getElementById('review-due').textContent = document.getElementById('due_date').value || '-';
+            document.getElementById('review-duration').textContent = 
+                (document.getElementById('estimated_duration').value || '0') + ' minutes';
+            document.getElementById('review-instructions').textContent = 
+                document.getElementById('instructions').value || 'No instructions provided';
+            
+            // Student count (would be real data in implementation)
+            document.getElementById('review-students').textContent = 'All active students';
+        }
+        
+        // Test voice prompt (simulated)
+        function testVoicePrompt() {
+            const prompt = document.getElementById('voice_prompt').value;
+            if (prompt) {
+                alert('Voice preview: ' + prompt);
+                // In real implementation, this would use Web Speech API
+            } else {
+                alert('Please enter a voice prompt first');
+            }
+        }
+        
+        // Initialize
+        loadStudents();
+        // Trigger assignment type change to set initial state
+        assignmentTypeSelect.dispatchEvent(new Event('change'));
+    });
+</script>
+{% endblock %}

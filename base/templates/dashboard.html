@@ -1,0 +1,775 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Dashboard - ShuleVoice{% endblock %}
+
+{% block content %}
+<!-- Stats Cards -->
+<div class="stats-cards">
+    <div class="stat-card">
+        <div class="stat-icon blue">
+            <i class="fas fa-users"></i>
+        </div>
+        <div class="stat-info">
+            <h3>{{ total_students }}</h3>
+            <p>Total Students</p>
+            <div class="progress-bar">
+                <div class="progress" style="width: {{ student_progress_percentage }}%"></div>
+            </div>
+            <span class="metric-change {% if new_students_this_week > 0 %}positive{% else %}neutral{% endif %}">
+                +{{ new_students_this_week }} this week
+            </span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon green">
+            <i class="fas fa-check-circle"></i>
+        </div>
+        <div class="stat-info">
+            <h3>{{ average_progress }}%</h3>
+            <p>Average Progress</p>
+            <div class="progress-bar">
+                <div class="progress" style="width: {{ average_progress }}%"></div>
+            </div>
+            <span class="metric-change {% if progress_change >= 0 %}positive{% else %}negative{% endif %}">
+                {% if progress_change >= 0 %}+{% endif %}{{ progress_change }}% from last week
+            </span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon orange">
+            <i class="fas fa-tasks"></i>
+        </div>
+        <div class="stat-info">
+            <h3>{{ completed_tasks }}</h3>
+            <p>Completed Tasks</p>
+            <div class="progress-bar">
+                <div class="progress" style="width: {{ task_completion_rate }}%"></div>
+            </div>
+            <span class="metric-change {% if new_tasks_completed > 0 %}positive{% else %}neutral{% endif %}">
+                +{{ new_tasks_completed }} today
+            </span>
+        </div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon purple">
+            <i class="fas fa-chart-line"></i>
+        </div>
+        <div class="stat-info">
+            <h3>{{ engagement_rate }}%</h3>
+            <p>Engagement Rate</p>
+            <div class="progress-bar">
+                <div class="progress" style="width: {{ engagement_rate }}%"></div>
+            </div>
+            <span class="metric-change {{ engagement_change_class }}">
+                {% if engagement_change >= 0 %}+{% endif %}{{ engagement_change }}% change
+            </span>
+        </div>
+    </div>
+</div>
+
+<!-- Real Data Summary -->
+<div class="data-summary">
+    <div class="summary-item">
+        <i class="fas fa-database"></i>
+        <span>{{ total_progress_records }} progress records</span>
+    </div>
+    <div class="summary-item">
+        <i class="fas fa-user-check"></i>
+        <span>{{ active_students_count }} active students</span>
+    </div>
+    <div class="summary-item">
+        <i class="fas fa-chart-bar"></i>
+        <span>{{ subject_progress|length }} subjects with data</span>
+    </div>
+</div>
+
+<!-- Charts and Data Section -->
+<div class="data-section">
+    <div class="chart-container">
+        <div class="section-header">
+            <h2>Student Progress Overview</h2>
+            <div class="section-actions">
+                <button class="btn btn-outline" id="timeFilter">
+                    <i class="fas fa-calendar"></i> Last 30 days
+                </button>
+                <button class="btn btn-primary" id="exportData">
+                    <i class="fas fa-download"></i> Export
+                </button>
+            </div>
+        </div>
+        <div class="progress-chart">
+            {% for subject in subject_progress %}
+            <div class="bar">
+                <div class="bar-fill" style="height: {{ subject.progress }}%"></div>
+                <div class="bar-label">{{ subject.name }}</div>
+            </div>
+            {% empty %}
+            <div class="no-data-message">
+                <i class="fas fa-chart-bar"></i>
+                <p>No subject progress data available yet</p>
+                <small>Progress data will appear here as students complete assignments</small>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="recent-activity">
+        <div class="section-header">
+            <h2>Recent Activity</h2>
+            <a href="{% url 'activity_log' %}" class="btn btn-outline">
+                <i class="fas fa-list"></i> View All
+            </a>
+        </div>
+        <ul class="activity-list">
+            {% for activity in recent_activities %}
+            <li class="activity-item">
+                <div class="activity-icon {{ activity.type }}">
+                    <i class="fas fa-{{ activity.icon }}"></i>
+                </div>
+                <div class="activity-content">
+                    <h4>
+                        {% if activity.type == 'progress' %}Progress Update
+                        {% elif activity.type == 'voice' %}Voice Interaction
+                        {% elif activity.type == 'alert' %}System Alert
+                        {% elif activity.type == 'system' %}System Message
+                        {% else %}Activity{% endif %}
+                    </h4>
+                    <p>{{ activity.message }}</p>
+                    <div class="activity-time">{{ activity.timestamp|timesince }} ago</div>
+                </div>
+            </li>
+            {% empty %}
+            <li class="activity-item">
+                <div class="activity-icon system">
+                    <i class="fas fa-info-circle"></i>
+                </div>
+                <div class="activity-content">
+                    <h4>Welcome to ShuleVoice!</h4>
+                    <p>Your activity log will appear here as you use the system</p>
+                    <div class="activity-time">Just now</div>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+
+<!-- Student List -->
+<div class="chart-container">
+    <div class="section-header">
+        <h2>Top Performers</h2>
+        <div class="section-actions">
+            <a href="{% url 'students' %}" class="btn btn-outline">
+                <i class="fas fa-list"></i> View All Students
+            </a>
+            <a href="{% url 'add_student' %}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Add Student
+            </a>
+        </div>
+    </div>
+    <div class="student-list">
+        {% for student in top_students %}
+        <div class="student-item">
+            <div class="student-avatar">{{ student.name|slice:":2"|upper }}</div>
+            <div class="student-info">
+                <h4>{{ student.name }}</h4>
+                <p>Grade {{ student.grade_level }} | {{ student.current_subject }}</p>
+                {% if student.last_activity %}
+                <small>Last activity: {{ student.last_activity|date:"M j, g:i A" }}</small>
+                {% endif %}
+            </div>
+            <div class="student-progress">
+                <div class="progress-text">
+                    <span>Progress</span>
+                    <span>{{ student.progress }}%</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: {{ student.progress }}%"></div>
+                </div>
+                <div class="progress-comparison">
+                    {% if student.progress > 0 %}
+                    <small>Active learner</small>
+                    {% else %}
+                    <small>No progress yet</small>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="no-students-message">
+            <div class="no-students-icon">
+                <i class="fas fa-user-graduate"></i>
+            </div>
+            <h4>No Students Yet</h4>
+            <p>Get started by adding your first student to track their progress</p>
+            <a href="{% url 'add_student' %}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Add First Student
+            </a>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Enhanced Stats Cards */
+    .stats-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .stat-card {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        transition: transform 0.3s ease;
+        border-left: 4px solid transparent;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+    }
+
+    .stat-icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.8rem;
+        color: white;
+    }
+
+    .stat-icon.blue {
+        background: linear-gradient(135deg, var(--primary), var(--accent));
+        border-left-color: var(--primary);
+    }
+
+    .stat-icon.green {
+        background: linear-gradient(135deg, var(--success), #22c55e);
+        border-left-color: var(--success);
+    }
+
+    .stat-icon.orange {
+        background: linear-gradient(135deg, var(--warning), #f97316);
+        border-left-color: var(--warning);
+    }
+
+    .stat-icon.purple {
+        background: linear-gradient(135deg, #a855f7, #ec4899);
+        border-left-color: #a855f7;
+    }
+
+    .stat-info {
+        flex: 1;
+    }
+
+    .stat-info h3 {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 0.3rem;
+        color: var(--dark);
+    }
+
+    .stat-info p {
+        color: var(--gray);
+        font-weight: 600;
+        margin-bottom: 0.8rem;
+    }
+
+    .progress-bar {
+        height: 6px;
+        background: var(--light-gray);
+        border-radius: 3px;
+        margin: 0.5rem 0;
+        overflow: hidden;
+    }
+
+    .progress {
+        height: 100%;
+        background: linear-gradient(90deg, var(--primary), var(--accent));
+        border-radius: 3px;
+        transition: width 0.5s ease;
+    }
+
+    .metric-change {
+        font-size: 0.8rem;
+        font-weight: 600;
+        display: block;
+        margin-top: 0.3rem;
+    }
+
+    .metric-change.positive {
+        color: var(--success);
+    }
+
+    .metric-change.negative {
+        color: var(--danger);
+    }
+
+    .metric-change.neutral {
+        color: var(--gray);
+    }
+
+    /* Data Summary */
+    .data-summary {
+        display: flex;
+        justify-content: center;
+        gap: 2rem;
+        margin: 2rem 0;
+        flex-wrap: wrap;
+    }
+
+    .summary-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: var(--light);
+        padding: 0.7rem 1.2rem;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        color: var(--gray);
+        border: 1px solid var(--light-gray);
+    }
+
+    .summary-item i {
+        color: var(--primary);
+    }
+
+    /* Charts and Data Section */
+    .data-section {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .chart-container {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    }
+
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+    }
+
+    .section-header h2 {
+        font-size: 1.3rem;
+        font-weight: 600;
+        color: var(--dark);
+    }
+
+    .section-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .btn {
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        border: none;
+        font-size: 0.9rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        text-decoration: none;
+    }
+
+    .btn-outline {
+        background: transparent;
+        border: 1px solid var(--light-gray);
+        color: var(--gray);
+    }
+
+    .btn-primary {
+        background-color: var(--primary);
+        color: white;
+    }
+
+    .btn-outline:hover {
+        background-color: var(--light-gray);
+    }
+
+    .btn-primary:hover {
+        background-color: #3651d4;
+    }
+
+    /* Progress Chart */
+    .progress-chart {
+        height: 300px;
+        display: flex;
+        align-items: flex-end;
+        gap: 10px;
+        padding: 1rem 0;
+        justify-content: center;
+    }
+
+    .bar {
+        flex: 1;
+        background: var(--light-gray);
+        border-radius: 4px 4px 0 0;
+        position: relative;
+        min-height: 40px;
+        max-width: 100px;
+    }
+
+    .bar-fill {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: linear-gradient(to top, var(--primary), var(--accent));
+        border-radius: 4px 4px 0 0;
+        transition: height 0.5s ease;
+    }
+
+    .bar-label {
+        position: absolute;
+        bottom: -25px;
+        left: 0;
+        right: 0;
+        text-align: center;
+        font-size: 0.8rem;
+        color: var(--gray);
+        font-weight: 500;
+    }
+
+    .no-data-message {
+        text-align: center;
+        padding: 3rem 2rem;
+        color: var(--gray);
+    }
+
+    .no-data-message i {
+        font-size: 3rem;
+        color: var(--light-gray);
+        margin-bottom: 1rem;
+    }
+
+    /* Recent Activity */
+    .recent-activity {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    }
+
+    .activity-list {
+        list-style: none;
+    }
+
+    .activity-item {
+        display: flex;
+        gap: 1rem;
+        padding: 1rem 0;
+        border-bottom: 1px solid var(--light-gray);
+    }
+
+    .activity-item:last-child {
+        border-bottom: none;
+    }
+
+    .activity-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1rem;
+        flex-shrink: 0;
+    }
+
+    .activity-icon.progress { background: #dcfce7; color: #166534; }
+    .activity-icon.voice { background: #dbeafe; color: #1d4ed8; }
+    .activity-icon.alert { background: #fef3c7; color: #d97706; }
+    .activity-icon.system { background: #f3e8ff; color: #7c3aed; }
+
+    .activity-content h4 {
+        font-weight: 600;
+        margin-bottom: 0.3rem;
+        color: var(--dark);
+    }
+
+    .activity-content p {
+        color: var(--gray);
+        font-size: 0.9rem;
+        margin-bottom: 0.3rem;
+    }
+
+    .activity-time {
+        color: var(--gray);
+        font-size: 0.8rem;
+    }
+
+    /* Student List */
+    .student-list {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        overflow: hidden;
+    }
+
+    .student-item {
+        display: flex;
+        align-items: center;
+        padding: 1.5rem;
+        border-bottom: 1px solid var(--light-gray);
+        transition: background 0.3s ease;
+    }
+
+    .student-item:hover {
+        background: #fafbfc;
+    }
+
+    .student-item:last-child {
+        border-bottom: none;
+    }
+
+    .student-avatar {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--primary), var(--accent));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+        margin-right: 1rem;
+        flex-shrink: 0;
+    }
+
+    .student-info {
+        flex: 1;
+    }
+
+    .student-info h4 {
+        font-weight: 600;
+        margin-bottom: 0.3rem;
+        color: var(--dark);
+    }
+
+    .student-info p {
+        color: var(--gray);
+        font-size: 0.9rem;
+        margin-bottom: 0.2rem;
+    }
+
+    .student-info small {
+        color: var(--gray);
+        font-size: 0.8rem;
+    }
+
+    .student-progress {
+        width: 150px;
+        text-align: right;
+    }
+
+    .progress-text {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.5rem;
+        font-size: 0.9rem;
+        font-weight: 600;
+    }
+
+    .progress-bar {
+        height: 6px;
+        background: var(--light-gray);
+        border-radius: 3px;
+        overflow: hidden;
+        margin-bottom: 0.3rem;
+    }
+
+    .progress-fill {
+        height: 100%;
+        background: linear-gradient(to right, var(--primary), var(--accent));
+        border-radius: 3px;
+        transition: width 0.5s ease;
+    }
+
+    .progress-comparison small {
+        color: var(--gray);
+        font-size: 0.8rem;
+    }
+
+    .no-students-message {
+        text-align: center;
+        padding: 3rem 2rem;
+    }
+
+    .no-students-icon {
+        font-size: 4rem;
+        color: var(--light-gray);
+        margin-bottom: 1rem;
+    }
+
+    .no-students-message h4 {
+        color: var(--dark);
+        margin-bottom: 0.5rem;
+    }
+
+    .no-students-message p {
+        color: var(--gray);
+        margin-bottom: 1.5rem;
+    }
+
+    /* Responsive Design */
+    @media (max-width: 1200px) {
+        .data-section {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .stats-cards {
+            grid-template-columns: 1fr;
+        }
+        
+        .data-summary {
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .section-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 1rem;
+        }
+        
+        .section-actions {
+            width: 100%;
+            justify-content: flex-end;
+        }
+        
+        .student-item {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 1rem;
+            text-align: center;
+        }
+        
+        .student-progress {
+            width: 100%;
+            text-align: left;
+        }
+        
+        .progress-chart {
+            flex-direction: column;
+            height: auto;
+            align-items: center;
+        }
+        
+        .bar {
+            width: 100%;
+            max-width: 200px;
+            height: 200px;
+        }
+        
+        .bar-fill {
+            width: 100%;
+            height: var(--progress-height);
+        }
+        
+        .bar-label {
+            bottom: -30px;
+        }
+    }
+
+    /* Animations */
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .stat-card, .chart-container, .recent-activity {
+        animation: fadeIn 0.6s ease-out;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Animate progress bars and charts
+        const progressBars = document.querySelectorAll('.progress-fill, .bar-fill');
+        progressBars.forEach(bar => {
+            const width = bar.style.width;
+            const height = bar.style.height;
+            bar.style.width = '0%';
+            bar.style.height = '0%';
+            setTimeout(() => {
+                bar.style.width = width;
+                bar.style.height = height;
+            }, 300);
+        });
+
+        // Time filter functionality
+        const timeFilter = document.getElementById('timeFilter');
+        if (timeFilter) {
+            timeFilter.addEventListener('click', function() {
+                // This would filter the chart data in a real implementation
+                alert('Time filter would update the progress chart data');
+            });
+        }
+
+        // Export data functionality
+        const exportData = document.getElementById('exportData');
+        if (exportData) {
+            exportData.addEventListener('click', function() {
+                const params = new URLSearchParams({
+                    type: 'progress',
+                    timeframe: '30days'
+                });
+                window.location.href = "{% url 'export_data' %}?" + params.toString();
+            });
+        }
+
+        // Add hover effects to student items
+        const studentItems = document.querySelectorAll('.student-item');
+        studentItems.forEach(item => {
+            item.addEventListener('mouseenter', function() {
+                this.style.transform = 'translateX(5px)';
+            });
+            item.addEventListener('mouseleave', function() {
+                this.style.transform = 'translateX(0)';
+            });
+        });
+
+        // Real-time data refresh (simulated)
+        function refreshData() {
+            // In a real app, this would fetch updated data from the server
+            console.log('Refreshing dashboard data...');
+        }
+
+        // Refresh data every 30 seconds
+        setInterval(refreshData, 30000);
+    });
+</script>
+{% endblock %}

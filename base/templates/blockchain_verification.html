@@ -1,0 +1,170 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}Blockchain Verification - {{ student.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="page-header">
+                <h1>Blockchain Verification</h1>
+                <p class="lead">Data integrity verification for {{ student.name }}</p>
+            </div>
+            
+            <!-- Integrity Status Card -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-md-8">
+                            <h3 class="card-title">
+                                <i class="fas fa-shield-alt me-2"></i>
+                                Data Integrity Status
+                            </h3>
+                            <p class="card-text">
+                                This system uses blockchain technology to ensure the integrity and immutability 
+                                of student progress records.
+                            </p>
+                        </div>
+                        <div class="col-md-4 text-end">
+                            <div class="integrity-badge {% if overall_integrity %}badge-success{% else %}badge-warning{% endif %}">
+                                <span class="badge {% if overall_integrity %}bg-success{% else %}bg-warning{% endif %} p-3">
+                                    <i class="fas fa-{% if overall_integrity %}check-circle{% else %}exclamation-triangle{% endif %} me-2"></i>
+                                    {% if overall_integrity %}Verified Integrity{% else %}Verification Needed{% endif %}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Statistics -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h3>{{ total_records }}</h3>
+                            <p class="text-muted">Blockchain Records</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h3 class="text-success">{{ valid_records }}</h3>
+                            <p class="text-muted">Valid Records</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h3 class="text-warning">{{ total_records|subtract:valid_records }}</h3>
+                            <p class="text-muted">Needs Verification</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h3>{{ student.blockchain_id|truncatechars:12 }}</h3>
+                            <p class="text-muted">Blockchain ID</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Verification Results -->
+            <div class="card">
+                <div class="card-header">
+                    <h4 class="card-title">Blockchain Verification Results</h4>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Type</th>
+                                    <th>Timestamp</th>
+                                    <th>Transaction Hash</th>
+                                    <th>Data Hash</th>
+                                    <th>Status</th>
+                                    <th>Block</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for result in verification_results %}
+                                <tr>
+                                    <td>
+                                        <span class="badge bg-primary">{{ result.type }}</span>
+                                    </td>
+                                    <td>{{ result.timestamp|naturaltime }}</td>
+                                    <td class="font-monospace small">{{ result.transaction_hash|truncatechars:20 }}</td>
+                                    <td class="font-monospace small">{{ result.data_hash|truncatechars:20 }}</td>
+                                    <td>
+                                        <span class="badge {% if result.is_valid %}bg-success{% else %}bg-warning{% endif %}">
+                                            {% if result.is_valid %}
+                                                <i class="fas fa-check"></i> Verified
+                                            {% else %}
+                                                <i class="fas fa-exclamation-triangle"></i> Unverified
+                                            {% endif %}
+                                        </span>
+                                    </td>
+                                    <td>#{{ result.block_index }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted py-4">
+                                        No blockchain records found for this student.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Blockchain Info -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h4 class="card-title">Blockchain Information</h4>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5>About Blockchain Verification</h5>
+                            <p>
+                                Each student progress update, achievement, and significant activity is recorded 
+                                on an immutable blockchain. This ensures that:
+                            </p>
+                            <ul>
+                                <li>Progress records cannot be tampered with</li>
+                                <li>Academic achievements are permanently verified</li>
+                                <li>Data integrity is maintained over time</li>
+                                <li>Transcripts and records are trustworthy</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h5>Technical Details</h5>
+                            <dl class="row">
+                                <dt class="col-sm-4">Blockchain Type</dt>
+                                <dd class="col-sm-8">Private Educational Blockchain</dd>
+                                
+                                <dt class="col-sm-4">Consensus</dt>
+                                <dd class="col-sm-8">Proof of Work (Educational)</dd>
+                                
+                                <dt class="col-sm-4">Hashing Algorithm</dt>
+                                <dd class="col-sm-8">SHA-256</dd>
+                                
+                                <dt class="col-sm-4">Block Time</dt>
+                                <dd class="col-sm-8">~10 minutes</dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
