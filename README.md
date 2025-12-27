@@ -1,4 +1,4 @@
-1. Device and System Design  
+ 1. Device and System Design  
 • The learning tool will be built using  Raspberry Pi or similar hardware.
 • It will include a microphone and speaker for voice input and output.
 • Speech recognition and synthesis will be handled by offline software tools such as Vosk and
